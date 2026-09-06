@@ -5,8 +5,23 @@ description = "Osmanlica el yazmasi HTR icin Kraken tabanli MCP sunucusu"
 requires-python = ">=3.10"
 dependencies = [
     "mcp[cli]>=1.2.0,<2.0.0",
-    "kraken>=6.0.0",
+    # Sabitlendi: gevsek bir "kraken>=6.0.0" kisiti, farkli ortamlarda
+    # (ör. Render'da) pip'in bu makinede kanitlanmis 7.1.1 yerine daha eski
+    # bir 6.x surumunu secmesine yol acti - o surumde run_kraken()'in
+    # kullandigi --num-line-workers secenegi yok, "No such option" hatasi
+    # verip cikiyordu.
+    "kraken==7.1.1",
     "pydantic>=2.0",
+    # NOT: kraken 7.1.1'in KENDI paket metadata'si safetensors~=0.7.0
+    # istiyor ama calisma zamaninda (TorchVGSLModel) safetensors>=0.8.0
+    # kontrol ediyor - kraken'in kendi paketleme hatasi. Burada safetensors'i
+    # acikca >=0.8.0'a zorlamak pip'in ResolutionImpossible vermesine yol
+    # aciyor (iki kisit matematiksel olarak kesismiyor). Cozum burada degil,
+    # Dockerfile'da: search-server (sentence-transformers/transformers,
+    # kendi safetensors ihtiyaci daha yeni) AYRI bir pip cagrisinda
+    # kuruluyor - bu, kraken'in burada kurdugu 0.7.0'i pip'in kraken'e
+    # karsi tekrar dogrulamadan 0.8+'a yukseltmesine izin veriyor (bu
+    # makinede tum oturum boyunca organik olarak calisan durum tam buydu).
     # ottoman-rag-common PyPI'da degil; once ayri kurulmali:
     #   pip install -e ../../packages/ottoman_rag_common
 ]

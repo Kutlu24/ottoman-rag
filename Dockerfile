@@ -45,15 +45,27 @@ COPY --chown=user backend ./backend
 # tekerleklerini ek bir kaynak olarak sunuyoruz - PEP 440'a gore "+cpu"
 # etiketli bir surum, ayni sürüm numarali etiketsiz (CUDA'li) surumden
 # daha yuksek onceliklidir, bu yuzden pip kendiliginden CPU surumunu
-# tercih eder, TEK pip cagrisinda (ayri bir adimin sonradan CUDA'li
-# surume yukseltmesine firsat kalmadan - asil OOM nedeni buydu).
+# tercih eder.
+#
+# Kraken/htr-server ve search-server BILEREK IKI AYRI RUN'da kuruluyor:
+# kraken 7.1.1 kendi paket metadata'sinda safetensors~=0.7.0 istiyor (bu,
+# kraken'in kendi calisma zamani ihtiyaciyla - safetensors>=0.8.0 -
+# celisen bir paketleme hatasi). Ikisini TEK cagrida kurmaya calismak
+# pip'in bu celiskiyi yakalayip ResolutionImpossible vermesine yol
+# aciyor. Ayri cagrilarda, search-server'in sentence-transformers/
+# transformers'i kendi (daha yeni) safetensors ihtiyacini pip'in
+# kraken'e karsi tekrar dogrulamadan kurabiliyor - bu makinede tum
+# oturum boyunca organik olarak calisan durum tam buydu.
 RUN pip install --no-cache-dir --user \
       --extra-index-url https://download.pytorch.org/whl/cpu \
       -e ./packages/ottoman_rag_common \
       -e ./mcp-servers/htr-server \
-      -e ./mcp-servers/search-server \
       -e ./ingestion \
       -e ./backend
+
+RUN pip install --no-cache-dir --user \
+      --extra-index-url https://download.pytorch.org/whl/cpu \
+      -e ./mcp-servers/search-server
 
 # Kraken Ottoman base modeli (OpenITI, Zenodo) - .gitignore'da oldugu icin
 # repodan degil, build sirasinda dogrudan indirilir.
