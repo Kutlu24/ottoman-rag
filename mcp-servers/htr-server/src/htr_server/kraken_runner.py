@@ -43,7 +43,12 @@ def _resolve_kraken_executable() -> str:
     return "kraken"  # son care: PATH aramasi
 
 
-def run_kraken(image_path: str, model_path: str) -> HtrPageResult:
+def run_kraken(image_path: str, model_path: str, device: str = "cpu") -> HtrPageResult:
+    """device: kraken'in -d/--device bayragi - "cpu" (varsayilan, her yerde
+    calisir), veya gercek bir GPU'su olan bir makinede/uzak sunucuda
+    "cuda:0" gibi bir deger. Uzak GPU altyapisi (Google Cloud, universite
+    sunucusu vb.) kullanan kurulumlarda bu deger "cuda:0" verilir - bkz.
+    mcp-servers/remote-htr-server."""
     image = Path(image_path)
     model = Path(model_path)
 
@@ -58,6 +63,7 @@ def run_kraken(image_path: str, model_path: str) -> HtrPageResult:
 
         cmd = [
             _resolve_kraken_executable(),
+            "-d", device,
             "-i", str(image), str(output_xml),
             "-x",
             "segment", "-bl",
@@ -108,6 +114,6 @@ def run_kraken(image_path: str, model_path: str) -> HtrPageResult:
             htr_run_id=str(uuid.uuid4()),
             backend="kraken",
             model_name=model.stem,
-            model_ref=model.name,
+            model_ref=f"{model.name} (device={device})",
         )
         return parse_page_xml(str(output_xml), str(image), htr_run)

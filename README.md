@@ -187,7 +187,11 @@ gerekiyorsa Kraken'i kullanır); ikisinin çıktısı da aynı `HtrPageResult` �
 
 - `packages/ottoman_rag_common/` — tüm servislerde paylaşılan provenance/HTR şemaları
   (`geometry`, `htr`, `provenance` — bkz. aşağıdaki tasarım notu)
-- `mcp-servers/htr-server/` — Kraken tabanlı HTR MCP sunucusu (satır bbox + metin üretir)
+- `mcp-servers/htr-server/` — Kraken tabanlı HTR MCP sunucusu (satır bbox + metin üretir),
+  yerel CPU'da çalışır
+- `mcp-servers/remote-htr-server/` — aynı Kraken motorunu GPU'lu uzak bir makinede
+  (Google Cloud Run + GPU, üniversite sunucusu vb.) HTTP üzerinden sunan referans
+  servis — bkz. aşağıdaki "Yerel/uzak HTR seçimi" notu
 - `mcp-servers/search-server/` — embedding + Chroma vektör arama MCP sunucusu
 - `.mcp.json` — `htr-kraken`, `transkribus`, `search-server` MCP sunucularının bağlantı tanımı
 - `ingestion/` — HTR çıktısını (her iki backend'den) provenance koruyarak chunk'layıp
@@ -230,6 +234,27 @@ karakter) chunk'lara böler; `mcp-servers/search-server` bu chunk'ları
 sonucunda aynı provenance alanlarını döndürür. `ingestion/smoke_test.py`,
 gerçek bir HTR çalıştırması olmadan bu zinciri sentetik veriyle uçtan uca
 doğrular.
+
+## Yerel/uzak HTR seçimi (CPU vs. GPU altyapısı)
+
+Kraken CPU'da yavaş çalışıyor (bir sayfa 1-2+ dakika sürebilir); bu, özellikle
+düşük RAM'li makinelerde veya çok sayıda sayfa işlerken can sıkıcı olabilir.
+Bunu çözmek için `htr_backend` seçimi eklendi — araştırmacı **her yükleme
+için** yerel CPU mu yoksa GPU'lu uzak bir sunucu mu kullanılacağını seçebilir
+("Yeni Sayfa Ekle" formunda bir seçici olarak sunulur):
+
+- **Yerel** (varsayılan) — `mcp-servers/htr-server`, bu makinenin CPU'sunda,
+  MCP stdio alt süreci olarak. Ek kurulum gerekmez.
+- **Uzak** — `mcp-servers/remote-htr-server`, aynı Kraken motorunu HTTP
+  üzerinden GPU'lu bir makinede sunar. Bunu **Google Cloud Run + GPU**,
+  bir **üniversite GPU sunucusu**, veya kendi GPU'lu makinenize deploy
+  edebilirsiniz — ayrıntılar `mcp-servers/remote-htr-server/README.md`'de.
+  Backend'in `.env`'inde `HTR_MODE=remote` (sunucu-genel varsayılan) ve
+  `REMOTE_HTR_URL`/`REMOTE_HTR_API_KEY` ayarlanır.
+
+Uzak mod, bu ortamda GPU olmadığı için sadece CPU'da (bağlantı/akış
+doğrulaması olarak) test edildi — gerçek GPU hızlanması için kendi GPU
+altyapınıza deploy edip `KRAKEN_DEVICE=cuda:0` ayarlamanız gerekir.
 
 ## HTR modelleri
 
@@ -366,6 +391,46 @@ doğrular.
         değil) — HF'nin kendi build sunucularında denenecek. Adım adım
         deploy talimatı yukarıdaki "Deploying to Hugging Face Spaces"
         (İngilizce) bölümünde.
+      - **Sonuç:** HF Spaces artık Docker Space açmak için PRO ($9/ay)
+        gerektiriyor (canlı araştırmayla doğrulandı); bunun yerine Render
+        ücretsiz katmanına geçildi. Render'da gerçek 3 hata bulunup
+        düzeltildi: `sentence-transformers`/`transformers` sürüm
+        uyuşmazlığı, ayrı `pip install` adımlarının CPU torch'u sessizce
+        CUDA'lı sürüme yükseltmesi (512MB OOM'a yol açıyordu), ve pip'in
+        eski bir kraken 6.x sürümünü seçmesi (`--num-line-workers`
+        seçeneği yok). Son olarak Render'ın ücretsiz **512MB RAM'i gerçek
+        Kraken OCR çalışması için yetersiz** çıktı (iş sırasında süreç
+        OOM'dan çöküp yeniden başlıyordu) — bu, kod ile çözülemeyen bir
+        donanım kısıtı. Kullanıcı bu noktada herkese açık deploy'dan
+        vazgeçip sistemi kendi bilgisayarında (yerel ağ dışına açmadan)
+        çalıştırmayı tercih etti.
+      - `mcp_clients.py::call_tool`'a `timeout` parametresi eklendi
+        (`asyncio.wait_for`) — gözlemlenen gerçek bir sorun: yavaş/yüklü
+        bir makinede Kraken çok uzun sürünce, tek iş parçacıklı asyncio
+        event loop'unda bu SADECE o isteği değil, sunucudaki TÜM diğer
+        istekleri de (ilgisiz olanlar dahil) süresiz donduruyordu.
+        `/ingest`'teki `run_htr` çağrısına 600 saniyelik bir sınır kondu.
+- [x] Step 7 — **Yerel/uzak (CPU/GPU) HTR seçimi.** Kraken'in CPU'da yavaş
+      olması (özellikle düşük RAM'li makinelerde) nedeniyle, araştırmacının
+      her yükleme için yerel CPU mu yoksa GPU'lu uzak bir sunucu mu
+      kullanılacağını seçebildiği bir mimari eklendi:
+      - `mcp-servers/remote-htr-server/` — aynı `kraken_runner.run_kraken()`'ı
+        HTTP üzerinden sunan yeni, bağımsız bir servis; Google Cloud Run +
+        GPU, üniversite sunucusu veya kendi GPU'lu makineniz için bir
+        Dockerfile şablonu içeriyor (gerçek GPU'da test edilmedi).
+      - `kraken_runner.run_kraken()`'a `device` parametresi eklendi
+        (kraken'in `-d/--device` bayrağı: `cpu`/`cuda:0`).
+      - Backend'e `HTR_MODE`/`REMOTE_HTR_URL`/`REMOTE_HTR_API_KEY` config'i
+        ve `/ingest`'e `htr_backend` alanı eklendi (istek bazında seçim,
+        sunucu-genel varsayılanı ezer); frontend'e "İşlem yeri: Yerel/Uzak"
+        seçici eklendi.
+      - **Gerçek uçtan uca doğrulandı** (bu ortamda GPU olmadığı için
+        `device=cpu` ile, sadece akış/bağlantı testi olarak): bağımsız
+        `remote-htr-server`'a gerçek bir görüntüyle `POST /run-htr` (200,
+        doğru `HtrPageResult`), ve backend'in `/ingest`'ine
+        `htr_backend: "remote"` ile gerçek bir istek (200,
+        `chunks_indexed: 1`) — ayrı, izole bir backend örneğiyle,
+        kullanıcının canlı oturumuna dokunmadan.
 
 ## Ortam kurulumu
 

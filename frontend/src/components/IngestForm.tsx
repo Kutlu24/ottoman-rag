@@ -1,5 +1,5 @@
 import { useState, type FormEvent } from "react";
-import { createManuscript, createPage, ingestPage, uploadImage } from "../api";
+import { createManuscript, createPage, ingestPage, uploadImage, type HtrBackend } from "../api";
 import { useLanguage } from "../i18n/LanguageContext";
 
 const emptyState = {
@@ -16,6 +16,7 @@ export function IngestForm() {
   const { t } = useLanguage();
   const [form, setForm] = useState(emptyState);
   const [file, setFile] = useState<File | null>(null);
+  const [htrBackend, setHtrBackend] = useState<HtrBackend>("local");
   const [busy, setBusy] = useState(false);
   const [step, setStep] = useState("");
   const [result, setResult] = useState<string | null>(null);
@@ -58,7 +59,7 @@ export function IngestForm() {
       await createPage(page);
 
       setStep(t.ingestStepRun);
-      const ingestResult = await ingestPage(manuscript, page, form.krakenModel || undefined);
+      const ingestResult = await ingestPage(manuscript, page, form.krakenModel || undefined, htrBackend);
 
       setResult(t.ingestSuccess(ingestResult.chunks_indexed, manuscript.manuscript_id));
       setForm(emptyState);
@@ -131,6 +132,14 @@ export function IngestForm() {
           onChange={(e) => setFile(e.target.files?.[0] ?? null)}
           required
         />
+      </label>
+
+      <label>
+        {t.ingestBackendLabel}
+        <select value={htrBackend} onChange={(e) => setHtrBackend(e.target.value as HtrBackend)}>
+          <option value="local">{t.ingestBackendLocal}</option>
+          <option value="remote">{t.ingestBackendRemote}</option>
+        </select>
       </label>
 
       <button type="submit" disabled={busy}>

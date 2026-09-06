@@ -1,0 +1,20 @@
+[project]
+name = "remote-htr-server"
+version = "0.1.0"
+description = "Kraken HTR'i GPU'lu uzak bir makinede (Google Cloud, universite sunucusu vb.) HTTP uzerinden sunan referans servis"
+requires-python = ">=3.10"
+dependencies = [
+    "fastapi>=0.110.0",
+    "uvicorn[standard]>=0.29.0",
+    "python-multipart>=0.0.9",
+    # Once ayri kurulmali:
+    #   pip install -e ../../packages/ottoman_rag_common
+    #   pip install -e ../htr-server
+]
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/remote_htr_server"]

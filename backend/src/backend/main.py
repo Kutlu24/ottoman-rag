@@ -8,6 +8,7 @@ import uuid
 from contextlib import asynccontextmanager
 from pathlib import Path
 
+import httpx
 from fastapi import FastAPI, HTTPException, Request, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse, Response
@@ -27,10 +28,13 @@ from .config import (
     CHROMA_DB_DIR,
     EMBEDDING_MODEL_NAME,
     HTR_KRAKEN_DIR,
+    HTR_MODE,
     KRAKEN_DEFAULT_MODEL,
     KRAKEN_MODEL_DIR,
     PROJECT_ROOT,
     RAW_IMAGES_DIR,
+    REMOTE_HTR_API_KEY,
+    REMOTE_HTR_URL,
     SEARCH_SERVER_DIR,
 )
 from .mcp_clients import McpClientManager
@@ -194,30 +198,63 @@ class IngestRequest(BaseModel):
     page: PageRef
     kraken_model: str | None = None
     max_chars: int = 400
+    # "local" (bu makinede CPU) | "remote" (GPU'lu uzak sunucu). Bos
+    # birakilirsa sunucunun HTR_MODE ortam degiskeni (varsayilan "local")
+    # kullanilir - boylece arastirmaci her yukleme icin secebilir.
+    htr_backend: str | None = None
 
 
 class IngestResponse(BaseModel):
     chunks_indexed: int
 
 
+async def _run_htr_remote(image_path: str, model_name: str | None) -> HtrPageResult:
+    if not REMOTE_HTR_URL:
+        raise HTTPException(
+            status_code=400,
+            detail="Uzak HTR seçildi ama REMOTE_HTR_URL yapılandırılmamış (.env).",
+        )
+    headers = {"x-api-key": REMOTE_HTR_API_KEY} if REMOTE_HTR_API_KEY else {}
+    async with httpx.AsyncClient(timeout=600) as client:
+        with open(image_path, "rb") as f:
+            files = {"file": (Path(image_path).name, f, "application/octet-stream")}
+            data = {"model_name": model_name} if model_name else {}
+            resp = await client.post(
+                f"{REMOTE_HTR_URL}/run-htr", files=files, data=data, headers=headers
+            )
+        if resp.status_code != 200:
+            raise HTTPException(
+                status_code=502,
+                detail=f"Uzak HTR sunucusu hata döndürdü ({resp.status_code}): {resp.text}",
+            )
+        return HtrPageResult.model_validate(resp.json())
+
+
 @app.post("/ingest", response_model=IngestResponse)
 async def ingest(req: IngestRequest) -> IngestResponse:
-    """Kraken ile bir sayfayı transkribe edip provenance koruyarak indeksler.
+    """Bir sayfayı transkribe edip provenance koruyarak indeksler.
 
-    Not: models/ altında bir .mlmodel dosyası olmadan çalışmaz (bkz. kök
-    README - OpenITI Ottoman base modeli). Transkribus üzerinden ingestion
-    henüz bu uç noktaya bağlanmadı.
+    HTR, htr_backend'e göre yerelde (Kraken, CPU, MCP alt süreci) ya da
+    uzak bir GPU sunucusunda (bkz. mcp-servers/remote-htr-server) çalışır.
+
+    Not: yerel modda models/ altında bir .mlmodel dosyası olmadan çalışmaz
+    (bkz. kök README - OpenITI Ottoman base modeli). Transkribus üzerinden
+    ingestion henüz bu uç noktaya bağlanmadı.
     """
     store.upsert_manuscript(req.manuscript)
     store.upsert_page(req.page)
 
-    htr_client = mcp_manager.get("htr-kraken")
-    raw_result = await htr_client.call_tool(
-        "run_htr",
-        {"image_path": req.page.image_path, "model_name": req.kraken_model},
-        timeout=600,  # Kraken CPU'da yavas olabilir; sunucuyu sonsuza kadar kilitlemesin
-    )
-    htr_result = HtrPageResult.model_validate(raw_result)
+    backend_choice = req.htr_backend or HTR_MODE
+    if backend_choice == "remote":
+        htr_result = await _run_htr_remote(req.page.image_path, req.kraken_model)
+    else:
+        htr_client = mcp_manager.get("htr-kraken")
+        raw_result = await htr_client.call_tool(
+            "run_htr",
+            {"image_path": req.page.image_path, "model_name": req.kraken_model},
+            timeout=600,  # Kraken CPU'da yavas olabilir; sunucuyu sonsuza kadar kilitlemesin
+        )
+        htr_result = HtrPageResult.model_validate(raw_result)
 
     chunks = chunk_page(htr_result, req.manuscript, req.page, max_chars=req.max_chars)
 

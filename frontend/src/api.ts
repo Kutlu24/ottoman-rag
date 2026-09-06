@@ -126,15 +126,23 @@ export interface IngestResponse {
   chunks_indexed: number;
 }
 
+export type HtrBackend = "local" | "remote";
+
 export async function ingestPage(
   manuscript: ManuscriptRef,
   page: PageRef,
   krakenModel?: string,
+  htrBackend?: HtrBackend,
 ): Promise<IngestResponse> {
   const res = await fetch(`${API_BASE}/ingest`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ manuscript, page, kraken_model: krakenModel || null }),
+    body: JSON.stringify({
+      manuscript,
+      page,
+      kraken_model: krakenModel || null,
+      htr_backend: htrBackend || null,
+    }),
   });
   return handle<IngestResponse>(res);
 }

@@ -43,6 +43,15 @@ KRAKEN_MODEL_DIR = _resolve_path(
 )
 KRAKEN_DEFAULT_MODEL = os.environ.get("KRAKEN_DEFAULT_MODEL", "")
 
+# HTR calisma yeri: "local" (bu makinede CPU, MCP alt sureci - varsayilan)
+# ya da "remote" (GPU'lu uzak bir sunucu, ör. Google Cloud Run + GPU veya
+# bir universite sunucusu - bkz. mcp-servers/remote-htr-server). Bu,
+# sunucu-genel varsayilani belirler; /ingest istegindeki htr_backend alani
+# kullanici bazinda ezebilir (frontend'de bir secici olarak sunulur).
+HTR_MODE = os.environ.get("HTR_MODE", "local")
+REMOTE_HTR_URL = os.environ.get("REMOTE_HTR_URL", "").rstrip("/")
+REMOTE_HTR_API_KEY = os.environ.get("REMOTE_HTR_API_KEY", "")
+
 # Yuklenen sayfa gorselleri. Kalici depolama gerektiren tek "kullanici
 # verisi" dizinlerinden biri (digerleri: CHROMA_DB_DIR, METADATA_DB_PATH) -
 # HF Spaces gibi ortamlarda /data altindaki kalici bir yola yonlendirilmeli.
