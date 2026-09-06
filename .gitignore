@@ -1,0 +1,13 @@
+__pycache__/
+*.pyc
+.venv/
+venv/
+.env
+node_modules/
+dist/
+build/
+*.mlmodel
+data/raw_images/
+data/page_xml/
+*.db
+.DS_Store

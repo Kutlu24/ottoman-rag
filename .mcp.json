@@ -1,0 +1,21 @@
+{
+  "mcpServers": {
+    "htr-kraken": {
+      "command": "python",
+      "args": ["-m", "htr_server.server"],
+      "cwd": "mcp-servers/htr-server/src",
+      "env": {
+        "KRAKEN_MODEL_DIR": "../models",
+        "KRAKEN_DEFAULT_MODEL": "ottoman_print_base.mlmodel"
+      }
+    },
+    "transkribus": {
+      "command": "npx",
+      "args": ["-y", "@lazyants/transkribus-mcp-server"],
+      "env": {
+        "TRANSKRIBUS_USER": "${TRANSKRIBUS_USER}",
+        "TRANSKRIBUS_PASSWORD": "${TRANSKRIBUS_PASSWORD}"
+      }
+    }
+  }
+}
