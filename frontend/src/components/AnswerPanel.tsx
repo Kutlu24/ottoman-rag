@@ -1,15 +1,18 @@
 import type { AskResponse } from "../api";
+import { useLanguage } from "../i18n/LanguageContext";
 import { ManuscriptViewer } from "./ManuscriptViewer";
 
 export function AnswerPanel({ result }: { result: AskResponse }) {
+  const { t } = useLanguage();
+
   return (
     <div className="answer-panel">
-      <h2>Cevap</h2>
+      <h2>{t.answerTitle}</h2>
       <p className="answer-text">{result.answer}</p>
 
       {result.citations.length > 0 && (
         <>
-          <h3>Kaynaklar</h3>
+          <h3>{t.sourcesTitle}</h3>
           <div className="citations">
             {result.citations.map((c) => (
               <div className="citation-card" key={c.chunk_id}>

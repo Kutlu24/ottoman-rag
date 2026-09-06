@@ -99,7 +99,24 @@ _ANSWER_TOOL = {
 }
 
 
-def _build_prompt(question: str, passages: list[dict]) -> str:
+def _build_prompt(question: str, passages: list[dict], language: str) -> str:
+    if language == "en":
+        lines = [
+            "You are an assistant helping with research on Ottoman manuscripts.",
+            "The following passages were transcribed via HTR (handwritten text "
+            "recognition) from source documents; they may contain garbled "
+            "characters from recognition errors. Answer ONLY in English, based "
+            "solely on these passages; if they are not sufficient to answer the "
+            "question, say so clearly rather than guessing.",
+            "",
+            "Passages:",
+        ]
+        for i, p in enumerate(passages, start=1):
+            lines.append(f"[{i}] (Source: {p.get('citation_label') or p['manuscript_id']}) {p['text']}")
+        lines.append("")
+        lines.append(f"Question: {question}")
+        return "\n".join(lines)
+
     lines = [
         "Sen Osmanlıca el yazması araştırmalarına yardımcı olan bir asistansın.",
         "Aşağıdaki pasajlar HTR (el yazması tanıma) ile transkribe edilmiş kaynak "
@@ -121,6 +138,7 @@ async def answer_question(
     question: str,
     manuscript_id: str | None = None,
     top_k: int = 5,
+    language: str = "tr",
 ) -> AskResponse:
     search_client = mcp_manager.get("search")
     passages: list[dict] = await search_client.call_tool(
@@ -129,12 +147,14 @@ async def answer_question(
     )
 
     if not passages:
-        return AskResponse(
-            answer="Bu soruyla ilgili dizinlenmiş bir kaynak bulunamadı.",
-            citations=[],
+        no_source_msg = (
+            "No indexed source was found for this question."
+            if language == "en"
+            else "Bu soruyla ilgili dizinlenmiş bir kaynak bulunamadı."
         )
+        return AskResponse(answer=no_source_msg, citations=[])
 
-    prompt = _build_prompt(question, passages)
+    prompt = _build_prompt(question, passages, language)
     client = get_anthropic_client()
     message = client.messages.create(
         model=ANTHROPIC_MODEL,

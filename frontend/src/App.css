@@ -4,6 +4,31 @@
   padding: 2rem 1.5rem 4rem;
 }
 
+.lang-switch {
+  display: flex;
+  justify-content: flex-end;
+  gap: 0.4rem;
+  margin-bottom: 0.5rem;
+}
+
+.lang-btn {
+  font: inherit;
+  font-size: 0.8rem;
+  font-weight: 600;
+  padding: 0.3rem 0.7rem;
+  border: 1px solid #d8d1c4;
+  border-radius: 999px;
+  background: #fff;
+  color: #4a4237;
+  cursor: pointer;
+}
+
+.lang-btn.active {
+  background: #4a4237;
+  border-color: #4a4237;
+  color: #fff;
+}
+
 header h1 {
   font-size: 1.6rem;
   margin-bottom: 0.25rem;

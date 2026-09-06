@@ -37,6 +37,7 @@ export async function askQuestion(
   question: string,
   manuscriptId?: string,
   topK = 5,
+  language: "tr" | "en" = "tr",
 ): Promise<AskResponse> {
   const res = await fetch(`${API_BASE}/ask`, {
     method: "POST",
@@ -45,6 +46,7 @@ export async function askQuestion(
       question,
       manuscript_id: manuscriptId || null,
       top_k: topK,
+      language,
     }),
   });
   if (!res.ok) {

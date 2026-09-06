@@ -2,11 +2,13 @@ import { useState, type FormEvent } from "react";
 import { askQuestion, type AskResponse } from "./api";
 import { AnswerPanel } from "./components/AnswerPanel";
 import { IngestForm } from "./components/IngestForm";
+import { useLanguage } from "./i18n/LanguageContext";
 import "./App.css";
 
 type Tab = "ask" | "ingest";
 
 export default function App() {
+  const { lang, setLang, t } = useLanguage();
   const [tab, setTab] = useState<Tab>("ask");
   const [question, setQuestion] = useState("");
   const [manuscriptId, setManuscriptId] = useState("");
@@ -21,7 +23,7 @@ export default function App() {
     setError(null);
     setResult(null);
     try {
-      const res = await askQuestion(question.trim(), manuscriptId.trim() || undefined);
+      const res = await askQuestion(question.trim(), manuscriptId.trim() || undefined, 5, lang);
       setResult(res);
     } catch (err) {
       setError(err instanceof Error ? err.message : String(err));
@@ -32,12 +34,26 @@ export default function App() {
 
   return (
     <div className="app">
+      <div className="lang-switch">
+        <button
+          type="button"
+          className={lang === "tr" ? "lang-btn active" : "lang-btn"}
+          onClick={() => setLang("tr")}
+        >
+          TR
+        </button>
+        <button
+          type="button"
+          className={lang === "en" ? "lang-btn active" : "lang-btn"}
+          onClick={() => setLang("en")}
+        >
+          EN
+        </button>
+      </div>
+
       <header>
-        <h1>Osmanlıca El Yazması Araştırma Asistanı</h1>
-        <p className="subtitle">
-          Sorunuzu yazın; cevap, kaynak sayfa görüntüsünde ilgili satırlar
-          işaretlenmiş şekilde gösterilir.
-        </p>
+        <h1>{t.appTitle}</h1>
+        <p className="subtitle">{t.appSubtitle}</p>
       </header>
 
       <nav className="tabs">
@@ -46,14 +62,14 @@ export default function App() {
           className={tab === "ask" ? "tab active" : "tab"}
           onClick={() => setTab("ask")}
         >
-          Soru Sor
+          {t.tabAsk}
         </button>
         <button
           type="button"
           className={tab === "ingest" ? "tab active" : "tab"}
           onClick={() => setTab("ingest")}
         >
-          Yeni Sayfa Ekle
+          {t.tabIngest}
         </button>
       </nav>
 
@@ -62,19 +78,19 @@ export default function App() {
           <form onSubmit={handleSubmit} className="ask-form">
             <input
               type="text"
-              placeholder="Yazma eser ID (opsiyonel, boş bırakılırsa tüm koleksiyonda arar)"
+              placeholder={t.manuscriptIdPlaceholder}
               value={manuscriptId}
               onChange={(e) => setManuscriptId(e.target.value)}
             />
             <textarea
-              placeholder="Sorunuzu buraya yazın..."
+              placeholder={t.questionPlaceholder}
               value={question}
               onChange={(e) => setQuestion(e.target.value)}
               rows={3}
               required
             />
             <button type="submit" disabled={loading}>
-              {loading ? "Aranıyor..." : "Sor"}
+              {loading ? t.askButtonBusy : t.askButton}
             </button>
           </form>
 

@@ -80,11 +80,14 @@ class AskRequest(BaseModel):
     question: str
     manuscript_id: str | None = None
     top_k: int = 5
+    language: str = "tr"  # "tr" | "en" - cevabin uretilecegi dil
 
 
 @app.post("/ask", response_model=AskResponse)
 async def ask(req: AskRequest) -> AskResponse:
-    return await answer_question(mcp_manager, req.question, req.manuscript_id, req.top_k)
+    return await answer_question(
+        mcp_manager, req.question, req.manuscript_id, req.top_k, req.language
+    )
 
 
 @app.post("/manuscripts", response_model=ManuscriptRef)

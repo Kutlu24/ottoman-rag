@@ -135,6 +135,14 @@ doğrular.
       Transkribus'un kendi arayüzü gerekmeden, projenin kendi arayüzünden
       uçtan uca yeni sayfa eklenebiliyor. `/upload-image` gerçek bir
       dosyayla test edildi (doğru boyut: 785×2000 döndü).
+- [x] Step 4c — Frontend **TR/EN iki dilli** hale getirildi: `src/i18n/`
+      altında bir çeviri sözlüğü + `LanguageContext` (seçim `localStorage`'da
+      saklanır), sağ üstte dil değiştirici. Sadece arayüz metinleri değil,
+      Claude'un cevap dili de değişiyor — `/ask`'a eklenen `language`
+      parametresi backend'deki prompt'u (`rag.py`) İngilizce/Türkçe olarak
+      değiştiriyor. Gerçek bir soruyla `language=en` test edildi: cevap
+      doğru şekilde İngilizce üretildi, kaynak alıntısı (orijinal dilinde
+      olması gerektiği için) değişmedi.
 - [x] Step 5a — Gerçek görüntüyle uçtan uca Kraken testi, **dahil bir
       Windows subprocess deadlock'unun kök nedenine inilip çözülmesi:**
       - OpenITI'nin Kraken base modeli (`ottoman_best.mlmodel`, Zenodo

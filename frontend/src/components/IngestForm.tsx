@@ -1,5 +1,6 @@
 import { useState, type FormEvent } from "react";
 import { createManuscript, createPage, ingestPage, uploadImage } from "../api";
+import { useLanguage } from "../i18n/LanguageContext";
 
 const emptyState = {
   manuscriptId: "",
@@ -12,6 +13,7 @@ const emptyState = {
 };
 
 export function IngestForm() {
+  const { t } = useLanguage();
   const [form, setForm] = useState(emptyState);
   const [file, setFile] = useState<File | null>(null);
   const [busy, setBusy] = useState(false);
@@ -31,7 +33,7 @@ export function IngestForm() {
     setError(null);
     setResult(null);
     try {
-      setStep("Görüntü yükleniyor...");
+      setStep(t.ingestStepUpload);
       const uploaded = await uploadImage(file);
 
       const manuscript = {
@@ -51,14 +53,14 @@ export function IngestForm() {
         image_height: uploaded.image_height,
       };
 
-      setStep("Yazma/sayfa kaydı oluşturuluyor...");
+      setStep(t.ingestStepRecord);
       await createManuscript(manuscript);
       await createPage(page);
 
-      setStep("Kraken ile HTR çalıştırılıyor ve indeksleniyor (bu birkaç dakika sürebilir)...");
+      setStep(t.ingestStepRun);
       const ingestResult = await ingestPage(manuscript, page, form.krakenModel || undefined);
 
-      setResult(`Tamamlandı: ${ingestResult.chunks_indexed} chunk indekslendi. Yazma ID: ${manuscript.manuscript_id}`);
+      setResult(t.ingestSuccess(ingestResult.chunks_indexed, manuscript.manuscript_id));
       setForm(emptyState);
       setFile(null);
     } catch (err) {
@@ -73,7 +75,7 @@ export function IngestForm() {
     <form onSubmit={handleSubmit} className="ingest-form">
       <div className="field-row">
         <label>
-          Yazma eser ID *
+          {t.ingestManuscriptId}
           <input
             value={form.manuscriptId}
             onChange={(e) => set("manuscriptId", e.target.value)}
@@ -81,48 +83,48 @@ export function IngestForm() {
           />
         </label>
         <label>
-          Folio / sayfa etiketi
+          {t.ingestFolioLabel}
           <input
             value={form.folioLabel}
             onChange={(e) => set("folioLabel", e.target.value)}
-            placeholder="ör. 12r"
+            placeholder={t.ingestFolioPlaceholder}
           />
         </label>
       </div>
 
       <div className="field-row">
         <label>
-          Başlık
+          {t.ingestTitle}
           <input value={form.title} onChange={(e) => set("title", e.target.value)} />
         </label>
         <label>
-          Kütüphane / repository
+          {t.ingestRepository}
           <input value={form.repository} onChange={(e) => set("repository", e.target.value)} />
         </label>
       </div>
 
       <div className="field-row">
         <label>
-          Shelfmark
+          {t.ingestShelfmark}
           <input value={form.shelfmark} onChange={(e) => set("shelfmark", e.target.value)} />
         </label>
         <label>
-          Tarih
+          {t.ingestDate}
           <input value={form.date} onChange={(e) => set("date", e.target.value)} />
         </label>
       </div>
 
       <label>
-        Kraken model dosyası (boş bırakılırsa varsayılan kullanılır)
+        {t.ingestKrakenModel}
         <input
           value={form.krakenModel}
           onChange={(e) => set("krakenModel", e.target.value)}
-          placeholder="ör. ottoman_best.mlmodel"
+          placeholder={t.ingestKrakenModelPlaceholder}
         />
       </label>
 
       <label>
-        Sayfa görüntüsü *
+        {t.ingestImage}
         <input
           type="file"
           accept="image/jpeg,image/png,image/tiff"
@@ -132,7 +134,7 @@ export function IngestForm() {
       </label>
 
       <button type="submit" disabled={busy}>
-        {busy ? step || "İşleniyor..." : "Yükle ve İndeksle"}
+        {busy ? step || t.ingestSubmitBusy : t.ingestSubmit}
       </button>
 
       {error && <p className="error">{error}</p>}

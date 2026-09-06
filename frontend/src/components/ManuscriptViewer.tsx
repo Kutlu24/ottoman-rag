@@ -1,5 +1,6 @@
 import type { Citation } from "../api";
 import { pageImageUrl } from "../api";
+import { useLanguage } from "../i18n/LanguageContext";
 
 interface Props {
   citation: Citation;
@@ -11,8 +12,10 @@ interface Props {
  * <rect> koordinatlari manuel olcekleme gerekmeden dogru yerde kalir.
  */
 export function ManuscriptViewer({ citation }: Props) {
+  const { t } = useLanguage();
+
   if (!citation.image_path || !citation.image_width || !citation.image_height) {
-    return <p className="viewer-empty">Bu alıntı için görsel/boyut kaydı yok.</p>;
+    return <p className="viewer-empty">{t.viewerEmpty}</p>;
   }
 
   const w = citation.image_width;
