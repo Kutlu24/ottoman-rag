@@ -11,4 +11,5 @@ data/raw_images/
 data/page_xml/
 data/chroma/
 *.db
+*.tsbuildinfo
 .DS_Store

@@ -119,7 +119,14 @@ doğrular.
       döndürdü. Model **Haiku 4.5**; ölçülen gerçek maliyet **soru başına
       ~$0.0024** (1222 giriş + 244 çıkış token) — 5 dolarlık kredi ~2000
       soruya denk geliyor.
-- [ ] Step 4 — `frontend/` (viewer + highlight overlay)
+- [x] Step 4 — `frontend/` (React + TypeScript + Vite) — soru formu, cevap
+      paneli, ve sayfa görüntüsü üzerinde `bboxes`'ı doğrudan bir `<svg
+      viewBox>` koordinat uzayında çizen `ManuscriptViewer`. `npm run build`
+      hatasız geçti; backend'in gerçek `/ask` yanıtı frontend'in beklediği
+      tip şemasıyla birebir eşleşiyor. Gerçek tarayıcıda görsel doğrulama bu
+      ortamda yapılamadı (Claude-in-Chrome eklentisi bağlı değildi) — hem
+      backend (`:8000`) hem frontend (`:5173`) çalışır durumda bırakıldı,
+      elle kontrol edilebilir.
 - [ ] Step 5 — `training/` (Kraken fine-tuning, opsiyonel)
 
 ## Ortam kurulumu

@@ -1,0 +1,121 @@
+.app {
+  max-width: 900px;
+  margin: 0 auto;
+  padding: 2rem 1.5rem 4rem;
+}
+
+header h1 {
+  font-size: 1.6rem;
+  margin-bottom: 0.25rem;
+}
+
+.subtitle {
+  color: #6b6258;
+  margin-top: 0;
+}
+
+.ask-form {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+  background: #fff;
+  border: 1px solid #e3ddd2;
+  border-radius: 10px;
+  padding: 1.25rem;
+}
+
+.ask-form input,
+.ask-form textarea {
+  font: inherit;
+  padding: 0.6rem 0.75rem;
+  border: 1px solid #d8d1c4;
+  border-radius: 6px;
+  resize: vertical;
+}
+
+.ask-form button {
+  align-self: flex-start;
+  font: inherit;
+  font-weight: 600;
+  padding: 0.6rem 1.4rem;
+  border: none;
+  border-radius: 6px;
+  background: #8a5a2f;
+  color: #fff;
+  cursor: pointer;
+}
+
+.ask-form button:disabled {
+  opacity: 0.6;
+  cursor: default;
+}
+
+.error {
+  color: #b3261e;
+  font-weight: 500;
+}
+
+.answer-panel {
+  margin-top: 2rem;
+}
+
+.answer-text {
+  font-size: 1.05rem;
+  line-height: 1.6;
+  background: #fff;
+  border: 1px solid #e3ddd2;
+  border-radius: 10px;
+  padding: 1rem 1.25rem;
+}
+
+.citations {
+  display: flex;
+  flex-direction: column;
+  gap: 1.5rem;
+}
+
+.citation-card {
+  background: #fff;
+  border: 1px solid #e3ddd2;
+  border-radius: 10px;
+  padding: 1rem;
+}
+
+.citation-card blockquote {
+  margin: 0.75rem 0 0;
+  padding-left: 0.75rem;
+  border-left: 3px solid #8a5a2f;
+  color: #4a4237;
+  font-style: italic;
+}
+
+.viewer-svg {
+  width: 100%;
+  max-height: 480px;
+  background: #efe9df;
+  border-radius: 6px;
+  display: block;
+}
+
+.highlight-box {
+  fill: rgba(255, 210, 0, 0.35);
+  stroke: #d99a00;
+  stroke-width: 4;
+}
+
+.citation-label {
+  margin: 0.5rem 0 0;
+  font-size: 0.85rem;
+  color: #6b6258;
+}
+
+.viewer-empty {
+  color: #6b6258;
+  font-style: italic;
+}
+
+.usage-note {
+  margin-top: 1.5rem;
+  font-size: 0.8rem;
+  color: #948b7d;
+}

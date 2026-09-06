@@ -3,6 +3,7 @@ from __future__ import annotations
 from contextlib import asynccontextmanager
 
 from fastapi import FastAPI, HTTPException
+from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse
 from ottoman_rag_common.htr import HtrPageResult
 from ottoman_rag_common.provenance import ManuscriptRef, PageRef
@@ -48,6 +49,16 @@ async def lifespan(app: FastAPI):
 
 
 app = FastAPI(title="Osmanlıca El Yazması RAG API", lifespan=lifespan)
+
+# Dev ortamında frontend (Vite, :5173) farklı origin'den backend'e (:8000)
+# istek atar; bu proje tek kullanıcılı bir araştırma aracı olduğu için
+# geniş bir origin listesi kabul edilebilir - üretime taşınırsa daraltılmalı.
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["http://localhost:5173", "http://127.0.0.1:5173"],
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
 
 
 class AskRequest(BaseModel):
