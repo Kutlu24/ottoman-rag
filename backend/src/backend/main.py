@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import re
+import sys
 import uuid
 from contextlib import asynccontextmanager
 from pathlib import Path
@@ -37,16 +38,21 @@ mcp_manager = McpClientManager()
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
+    # "python" yerine sys.executable: alt MCP surecleri backend'in kendi
+    # calistigi yorumlayiciyla acilir. Boylece backend nasil baslatilirsa
+    # baslatilsin (tam yol, conda activate, conda run), PATH'te "python"un
+    # hangi ortama cozuldugune bagli olmadan hep dogru (paketlerin kurulu
+    # oldugu) ortam kullanilir.
     await mcp_manager.start(
         "search",
-        command="python",
+        command=sys.executable,
         args=["-m", "search_server.server"],
         cwd=str(SEARCH_SERVER_DIR),
         env={"CHROMA_DB_DIR": CHROMA_DB_DIR, "EMBEDDING_MODEL_NAME": EMBEDDING_MODEL_NAME},
     )
     await mcp_manager.start(
         "htr-kraken",
-        command="python",
+        command=sys.executable,
         args=["-m", "htr_server.server"],
         cwd=str(HTR_KRAKEN_DIR),
         env={"KRAKEN_MODEL_DIR": KRAKEN_MODEL_DIR, "KRAKEN_DEFAULT_MODEL": KRAKEN_DEFAULT_MODEL},

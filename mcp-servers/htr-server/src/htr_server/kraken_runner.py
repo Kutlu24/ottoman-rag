@@ -12,6 +12,7 @@ daha stabil oldugu icin entegrasyonu CLI uzerinden yapiyoruz:
 from __future__ import annotations
 
 import subprocess
+import sys
 import tempfile
 import uuid
 from pathlib import Path
@@ -23,6 +24,22 @@ from .page_xml import parse_page_xml
 
 class KrakenError(RuntimeError):
     pass
+
+
+def _resolve_kraken_executable() -> str:
+    """"kraken" komutunu PATH aramasina birakmak yerine, bu surecin kendi
+    calistigi Python yorumlayicisiyla (sys.executable) ayni conda ortaminda
+    ara. Boylece backend/MCP sunucusu conda activate yapilmadan (ör. tam
+    yorumlayici yoluyla) baslatilsa bile kraken.exe bulunur - PATH'te
+    "kraken" adiyla eslesen (varsa) baska/yanlis bir ortamin sürümüne
+    duşulmez."""
+    candidate = Path(sys.executable).parent / "Scripts" / "kraken.exe"  # Windows
+    if candidate.exists():
+        return str(candidate)
+    candidate = Path(sys.executable).parent / "kraken"  # Unix
+    if candidate.exists():
+        return str(candidate)
+    return "kraken"  # son care: PATH aramasi
 
 
 def run_kraken(image_path: str, model_path: str) -> HtrPageResult:
@@ -39,7 +56,7 @@ def run_kraken(image_path: str, model_path: str) -> HtrPageResult:
         stderr_path = Path(tmpdir) / "stderr.log"
 
         cmd = [
-            "kraken",
+            _resolve_kraken_executable(),
             "-i", str(image), str(output_xml),
             "-x",
             "segment", "-bl",
