@@ -1,9 +1,79 @@
 # Osmanlıca El Yazması RAG Sistemi
 
+*[🇬🇧 English overview below](#english-overview) · Detaylı içerik ve geliştirme
+günlüğü Türkçe olarak devam ediyor.*
+
 Osmanlıca el yazması metinleri okuyabilen açık kaynak HTR modellerini MCP sunucuları
 olarak entegre eden, RAG tabanlı bir arama sistemi. Araştırmacı bir soru sorduğunda,
 cevabı kaynak metindeki ilgili satır(lar) görüntü üzerinde highlight edilmiş şekilde
 görebilir.
+
+---
+
+## English overview
+
+An open-source RAG (retrieval-augmented generation) system for research on **Ottoman
+Turkish manuscripts**. It integrates open-source and public HTR (handwritten text
+recognition) models as **MCP servers**, so a researcher can ask a natural-language
+question and see the answer with the exact supporting lines **highlighted directly
+on the source page image** — with full provenance (manuscript, folio, line, and the
+HTR model/confidence that produced the transcription) traced through every step.
+
+**Pipeline:** `Image → HTR → transcription → chunking → embedding → vector database
+→ retrieval → LLM → cited answer`, with a chunk-level provenance object (see
+"Pipeline ve provenance-aware retrieval tasarımı" below) carrying the source
+manuscript/page/line/bbox/HTR-model through the whole chain, so an answer can always
+be traced back to a precise citation and a highlight region — no separate lookup
+required.
+
+**HTR backends (two, used side by side):**
+- **[Kraken](https://kraken.re)** — fully open-source, self-hosted OCR/HTR engine.
+  Currently using [OpenITI's Ottoman print base model](https://zenodo.org/records/7050342)
+  from Zenodo; works fully offline, no account needed.
+- **[Transkribus](https://transkribus.org)** — public, pre-trained models via
+  [`@lazyants/transkribus-mcp-server`](https://github.com/lazyants/transkribus-mcp-server).
+  Default manuscript model: *Ottoman Fatwa Manuscripts* (htrId `169801`, **5.94% CER**,
+  PyLaia-based) — good results on real handwriting without needing to fine-tune Kraken
+  first. Platform-hosted, not self-hostable, but no cost beyond a free account for the
+  public models used here.
+
+**Stack:** Python (FastAPI backend, Kraken/search MCP servers, `mcp` SDK pinned to
+`<2.0.0`), React + TypeScript + Vite frontend (bilingual TR/EN UI, SVG-based highlight
+overlay), Chroma (vector DB) + SQLite (manuscript/page catalog), Claude API (Haiku 4.5
+by default — measured real cost ≈ **$0.002 per question**).
+
+### Quick start
+
+```bash
+conda create -n ottoman-rag python=3.11
+conda activate ottoman-rag
+pip install -e packages/ottoman_rag_common
+pip install -e mcp-servers/htr-server
+pip install -e mcp-servers/search-server
+pip install -e ingestion
+pip install -e backend
+
+cp .env.example .env   # then fill in ANTHROPIC_API_KEY at minimum
+
+cd backend/src
+uvicorn backend.main:app --port 8000
+# in a second terminal:
+cd frontend && npm install && npm run dev
+```
+
+Then open `http://localhost:5173`. See the Turkish sections below for the full
+architecture rationale, the provenance-aware chunking design, HTR model research
+(including sources considered and rejected), and a detailed development log
+(including real bugs found and fixed — Windows subprocess deadlocks, encoding
+issues, etc.) — kept in Turkish as the canonical, most current record of the
+project's design decisions.
+
+**Status:** core pipeline (HTR → chunking → embedding → retrieval → RAG → highlight)
+verified end-to-end with real data on both backends' happy paths; Transkribus's
+automated image-upload step is not yet wired up (see "Step 5b" below). License: no
+license file yet — treat as all-rights-reserved until one is added.
+
+---
 
 ## Mimari
 
