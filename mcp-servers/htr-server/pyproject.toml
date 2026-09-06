@@ -4,7 +4,7 @@ version = "0.1.0"
 description = "Osmanlica el yazmasi HTR icin Kraken tabanli MCP sunucusu"
 requires-python = ">=3.10"
 dependencies = [
-    "mcp[cli]>=1.2.0",
+    "mcp[cli]>=1.2.0,<2.0.0",
     "kraken>=6.0.0",
     "pydantic>=2.0",
     # ottoman-rag-common PyPI'da degil; once ayri kurulmali:

@@ -110,9 +110,12 @@ doğrular.
 - [x] Step 1a — `mcp-servers/htr-server` iskeleti (Kraken backend)
 - [x] Step 1b — `.mcp.json`'a `transkribus-mcp-server` entegrasyonu
 - [x] Step 2 — `packages/ottoman_rag_common` (provenance şeması) +
-      `ingestion/chunker.py` + `mcp-servers/search-server` (kod tamam,
-      canlı ortamda doğrulama bekleniyor)
-- [ ] Step 3 — `backend/` (FastAPI + RAG orchestrator + metadata store)
+      `ingestion/chunker.py` + `mcp-servers/search-server` — canlı ortamda
+      doğrulandı (sentetik veriyle uçtan uca)
+- [x] Step 3 — `backend/` (FastAPI + RAG orchestrator + SQLite metadata store) —
+      gerçek `uvicorn` sunucusu + gerçek MCP (stdio) client bağlantısıyla
+      doğrulandı; `/ask` sadece `ANTHROPIC_API_KEY` eksikliğinden bekleneni
+      verdi, retrieval zinciri tam çalışıyor
 - [ ] Step 4 — `frontend/` (viewer + highlight overlay)
 - [ ] Step 5 — `training/` (Kraken fine-tuning, opsiyonel)
 
@@ -125,7 +128,20 @@ pip install -e packages/ottoman_rag_common
 pip install -e mcp-servers/htr-server
 pip install -e mcp-servers/search-server
 pip install -e ingestion
+pip install -e backend
 
 # duman testi (Kraken/Transkribus gerekmez, sentetik veriyle uçtan uca doğrular)
 python -m ingestion.smoke_test
+
+# backend'i çalıştırma (.env'de ANTHROPIC_API_KEY dolu olmalı)
+cd backend/src
+uvicorn backend.main:app --reload
 ```
+
+**Not (çözüldü):** `mcp` paketinin en güncel sürümü (2.x) `FastMCP`'yi
+`MCPServer` olarak yeniden adlandırdı ve API'yi değiştirdi; bu proje henüz
+yaygın olarak desteklenmeyen bu değişikliği takip etmek yerine `mcp<2.0.0`'a
+sabitlendi. Ayrıca `.env`'deki göreli yollar (`CHROMA_DB_DIR` vb.), her MCP
+sunucusu kendi `cwd`'siyle ayrı bir subprocess olarak başladığından
+`backend/src/backend/config.py` içinde her zaman proje köküne göre mutlak
+yola çevriliyor.
