@@ -11,6 +11,7 @@ daha stabil oldugu icin entegrasyonu CLI uzerinden yapiyoruz:
 
 from __future__ import annotations
 
+import os
 import subprocess
 import sys
 import tempfile
@@ -78,9 +79,20 @@ def run_kraken(image_path: str, model_path: str) -> HtrPageResult:
         # cagri backend -> MCP -> kraken zincirinde sessizce donuyordu.
         # Dogrudan (MCP disinda) calistirilan cagrilarda stdin normal bir
         # konsol/dosya handle'i oldugundan bu sorun hic gorulmuyordu.
+        # PYTHONIOENCODING: kraken.exe de bir Python sureci; stdout'u bize
+        # (dosyaya) yonlendirilmis oldugu icin Windows'un varsayilan ANSI
+        # kod sayfasini (cp1252 vb.) kullanmaya calisiyor ve kendi ilerleme
+        # ciktisindaki '✓' gibi Unicode karakterleri yazamayip cokuyor.
+        # UTF-8'e zorlamak bunu onluyor.
+        child_env = {**os.environ, "PYTHONIOENCODING": "utf-8", "PYTHONUTF8": "1"}
+
         with open(stderr_path, "w", encoding="utf-8") as stderr_file:
             result = subprocess.run(
-                cmd, stdin=subprocess.DEVNULL, stdout=stderr_file, stderr=subprocess.STDOUT
+                cmd,
+                stdin=subprocess.DEVNULL,
+                stdout=stderr_file,
+                stderr=subprocess.STDOUT,
+                env=child_env,
             )
 
         stderr_text = stderr_path.read_text(encoding="utf-8", errors="replace")
