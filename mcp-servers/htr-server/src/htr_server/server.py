@@ -4,9 +4,9 @@ import os
 from pathlib import Path
 
 from mcp.server.fastmcp import FastMCP
+from ottoman_rag_common.htr import HtrPageResult
 
 from .kraken_runner import KrakenError, run_kraken
-from .models import HtrPageResult
 
 mcp = FastMCP("htr-server")
 

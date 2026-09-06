@@ -1,13 +1,14 @@
 [project]
-name = "htr-server"
+name = "search-server"
 version = "0.1.0"
-description = "Osmanlica el yazmasi HTR icin Kraken tabanli MCP sunucusu"
+description = "Embedding + vektor arama MCP sunucusu (provenance-aware chunk retrieval)"
 requires-python = ">=3.10"
 dependencies = [
     "mcp[cli]>=1.2.0",
-    "kraken>=6.0.0",
+    "chromadb>=0.5.0",
+    "sentence-transformers>=3.0.0",
     "pydantic>=2.0",
-    # ottoman-rag-common PyPI'da degil; once ayri kurulmali:
+    # Once ayri kurulmali:
     #   pip install -e ../../packages/ottoman_rag_common
 ]
 
@@ -16,4 +17,4 @@ requires = ["hatchling"]
 build-backend = "hatchling.build"
 
 [tool.hatch.build.targets.wheel]
-packages = ["src/htr_server"]
+packages = ["src/search_server"]

@@ -13,9 +13,11 @@ from __future__ import annotations
 
 import subprocess
 import tempfile
+import uuid
 from pathlib import Path
 
-from .models import HtrPageResult
+from ottoman_rag_common.htr import HtrPageResult, HtrRun
+
 from .page_xml import parse_page_xml
 
 
@@ -51,4 +53,10 @@ def run_kraken(image_path: str, model_path: str) -> HtrPageResult:
         if not output_xml.exists():
             raise KrakenError(f"kraken çıktı üretmedi, stderr:\n{result.stderr}")
 
-        return parse_page_xml(str(output_xml), str(image), model.name)
+        htr_run = HtrRun(
+            htr_run_id=str(uuid.uuid4()),
+            backend="kraken",
+            model_name=model.stem,
+            model_ref=model.name,
+        )
+        return parse_page_xml(str(output_xml), str(image), htr_run)

@@ -6,7 +6,8 @@ from __future__ import annotations
 
 import xml.etree.ElementTree as ET
 
-from .models import BoundingBox, HtrPageResult, Line, Point
+from ottoman_rag_common.geometry import BoundingBox, Point
+from ottoman_rag_common.htr import HtrPageResult, HtrRun, Line
 
 
 def _local(tag: str) -> str:
@@ -32,7 +33,7 @@ def _parse_points(points_attr: str) -> list[Point]:
     return points
 
 
-def parse_page_xml(xml_path: str, image_path: str, model_used: str) -> HtrPageResult:
+def parse_page_xml(xml_path: str, image_path: str, htr_run: HtrRun) -> HtrPageResult:
     tree = ET.parse(xml_path)
     root = tree.getroot()
 
@@ -72,7 +73,7 @@ def parse_page_xml(xml_path: str, image_path: str, model_used: str) -> HtrPageRe
 
     return HtrPageResult(
         image_path=image_path,
-        model_used=model_used,
+        htr_run=htr_run,
         image_width=width,
         image_height=height,
         lines=lines,

@@ -16,6 +16,15 @@
         "TRANSKRIBUS_USER": "${TRANSKRIBUS_USER}",
         "TRANSKRIBUS_PASSWORD": "${TRANSKRIBUS_PASSWORD}"
       }
+    },
+    "search-server": {
+      "command": "python",
+      "args": ["-m", "search_server.server"],
+      "cwd": "mcp-servers/search-server/src",
+      "env": {
+        "CHROMA_DB_DIR": "../../../data/chroma",
+        "EMBEDDING_MODEL_NAME": "intfloat/multilingual-e5-base"
+      }
     }
   }
 }

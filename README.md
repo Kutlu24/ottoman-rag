@@ -31,14 +31,51 @@ gerekiyorsa Kraken'i kullanır); ikisinin çıktısı da aynı `HtrPageResult` �
 
 ## Klasör yapısı
 
+- `packages/ottoman_rag_common/` — tüm servislerde paylaşılan provenance/HTR şemaları
+  (`geometry`, `htr`, `provenance` — bkz. aşağıdaki tasarım notu)
 - `mcp-servers/htr-server/` — Kraken tabanlı HTR MCP sunucusu (satır bbox + metin üretir)
-- `mcp-servers/search-server/` — embedding + vektör arama MCP sunucusu
-- `.mcp.json` — `htr-kraken` ve `transkribus` MCP sunucularının bağlantı tanımı
-- `ingestion/` — HTR çıktısını (her iki backend'den) chunk'layıp vektör DB'ye yazan pipeline
+- `mcp-servers/search-server/` — embedding + Chroma vektör arama MCP sunucusu
+- `.mcp.json` — `htr-kraken`, `transkribus`, `search-server` MCP sunucularının bağlantı tanımı
+- `ingestion/` — HTR çıktısını (her iki backend'den) provenance koruyarak chunk'layıp
+  vektör DB'ye yazan pipeline (`chunker.py`, duman testi: `smoke_test.py`)
 - `training/` — Kraken modelini kendi/MAKHZAN verisiyle fine-tune etme script'leri
 - `backend/` — FastAPI + RAG orchestrator
 - `frontend/` — React tabanlı araştırmacı arayüzü
-- `data/` — ham görüntüler, PAGE XML çıktıları, dev veritabanı
+- `data/` — ham görüntüler, PAGE XML çıktıları, Chroma verisi, dev veritabanı
+
+## Pipeline ve provenance-aware retrieval tasarımı
+
+Akış: **Image → HTR → transcription → chunking → embedding → vector database →
+retrieval → LLM → cited answer.** Projenin temel hedefi bu akış boyunca
+**manuscript provenance**'ın (hangi yazma, hangi sayfa/folio, hangi satır,
+hangi HTR modeliyle üretildi) hiç kaybolmamasını sağlamak — böylece RAG
+cevabı, kaynak görüntüde tam olarak hangi satırların highlight edileceğini
+ve tam bir bilimsel atıfı (repository, shelfmark, folio) her zaman
+üretebilir.
+
+Bunu şu şekilde uyguladık (`packages/ottoman_rag_common/provenance.py`):
+
+- **Chunk kendi provenance'ını taşır** (loose coupling değil): her `Chunk`
+  nesnesi `manuscript_id`, `page_id`, kaynak `line_ids` ve bunlarla birebir
+  eşleşen `bboxes` listesini, hangi `HtrRun` (backend + model + CER) ile
+  üretildiğini içerir.
+- **Hibrit depolama:** vektör DB'nin (Chroma) metadata alanında yalnızca
+  retrieval-zamanı filtreleme ve highlight için gereken alanlar tutulur;
+  yazmanın tam katalog kaydı (Step 3'te) ayrı bir metadata store'da tek
+  doğruluk kaynağı olarak duracak. `citation_label` bu kayıttan önceden
+  hesaplanıp chunk'a "cache'lenmiş" bir görüntü alanı olarak taşınır — bu
+  sayede retrieval ekstra join gerektirmeden doğrudan atıf üretebilir.
+- **Model/versiyon izlenebilirliği:** `HtrRun.htr_run_id`/`model_ref` sayesinde
+  hangi transkripsiyonun hangi modelden (ve dolayısıyla ne CER ile) geldiği
+  her zaman biliniyor; ileride daha iyi bir model ile yeniden transkribe
+  edildiğinde eski/yeni chunk'lar birbirine karışmaz.
+
+`ingestion/chunker.py` satırları ardışık pencereleme ile (varsayılan ~400
+karakter) chunk'lara böler; `mcp-servers/search-server` bu chunk'ları
+`intfloat/multilingual-e5-base` ile embed edip Chroma'ya yazar ve arama
+sonucunda aynı provenance alanlarını döndürür. `ingestion/smoke_test.py`,
+gerçek bir HTR çalıştırması olmadan bu zinciri sentetik veriyle uçtan uca
+doğrular.
 
 ## HTR modelleri
 
@@ -72,7 +109,23 @@ gerekiyorsa Kraken'i kullanır); ikisinin çıktısı da aynı `HtrPageResult` �
 
 - [x] Step 1a — `mcp-servers/htr-server` iskeleti (Kraken backend)
 - [x] Step 1b — `.mcp.json`'a `transkribus-mcp-server` entegrasyonu
-- [ ] Step 2 — `ingestion/` + `mcp-servers/search-server`
-- [ ] Step 3 — `backend/` (FastAPI + RAG orchestrator)
+- [x] Step 2 — `packages/ottoman_rag_common` (provenance şeması) +
+      `ingestion/chunker.py` + `mcp-servers/search-server` (kod tamam,
+      canlı ortamda doğrulama bekleniyor)
+- [ ] Step 3 — `backend/` (FastAPI + RAG orchestrator + metadata store)
 - [ ] Step 4 — `frontend/` (viewer + highlight overlay)
 - [ ] Step 5 — `training/` (Kraken fine-tuning, opsiyonel)
+
+## Ortam kurulumu
+
+```
+conda create -n ottoman-rag python=3.11
+conda activate ottoman-rag
+pip install -e packages/ottoman_rag_common
+pip install -e mcp-servers/htr-server
+pip install -e mcp-servers/search-server
+pip install -e ingestion
+
+# duman testi (Kraken/Transkribus gerekmez, sentetik veriyle uçtan uca doğrular)
+python -m ingestion.smoke_test
+```
