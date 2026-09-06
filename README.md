@@ -123,6 +123,40 @@ Kraken OCR is CPU-only and slow (~1–2 min/page on modest hardware) — expect 
 on a free CPU Space. Transkribus remains the faster option once its upload step is
 wired up (see "Step 5b").
 
+**Note on cost (checked live, not from training data — this changed recently):** as of
+around July 2026, Hugging Face requires a **PRO subscription ($9/mo)** just to *create*
+a Docker/Gradio Space, even on the free CPU Basic hardware tier; only Static Spaces
+(which can't run this app — no backend) remain free. See the alternative below if you
+want a genuinely free option first.
+
+### Alternative: deploying to Render (free tier)
+
+[Render](https://render.com) still has a real free tier for Docker web services — no
+credit card required. Two real caveats: **512MB RAM** (tight for this stack — see the
+mitigation below) and the free instance **sleeps after 15 minutes of inactivity**
+(30–60s cold start on the next request).
+
+1. Push this repo to GitHub (already done if you're reading this there).
+2. On [render.com](https://render.com) → **New** → **Blueprint**, connect the repo.
+   Render auto-detects `render.yaml` at the repo root and the `Dockerfile` it points to.
+3. In the Render dashboard, fill in the secrets it prompts for (marked `sync: false`
+   in `render.yaml`): `ANTHROPIC_API_KEY`, `BASIC_AUTH_USER`, `BASIC_AUTH_PASSWORD`.
+4. `render.yaml` already sets `EMBEDDING_MODEL_NAME=intfloat/multilingual-e5-small`
+   (smaller than the default `-base` model) specifically to reduce memory pressure
+   on the free 512MB tier — switch it back to `-base` if you move to a plan with
+   more RAM.
+5. Render's free tier disk is **ephemeral** — same caveat as HF without persistent
+   storage: uploaded manuscripts/index reset on every restart/redeploy. Render does
+   offer paid persistent disks if you outgrow the free tier.
+
+If 512MB proves too tight in practice (the embedding model + Kraken's own memory use
+during OCR are the likely pressure points), the next free option to try is
+**[Oracle Cloud's Always Free tier](https://www.oracle.com/cloud/free/)** — genuinely
+free forever, real VMs (2 OCPU / 12GB RAM as of mid-2026), where you run this same
+`Dockerfile` yourself with `docker build` + `docker run` — full control, no PaaS
+memory/sleep limits, at the cost of doing your own server setup (reverse proxy, TLS,
+updates).
+
 ---
 
 ## Mimari

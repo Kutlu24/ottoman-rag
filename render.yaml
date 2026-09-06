@@ -1,0 +1,17 @@
+services:
+  - type: web
+    name: ottoman-rag
+    runtime: docker
+    plan: free
+    envVars:
+      - key: ANTHROPIC_API_KEY
+        sync: false
+      - key: BASIC_AUTH_USER
+        sync: false
+      - key: BASIC_AUTH_PASSWORD
+        sync: false
+      # 512MB ucretsiz RAM'e sigmasi icin kucuk embedding modeli - HF/kendi
+      # sunucunuzda daha buyuk RAM varsa intfloat/multilingual-e5-base'e
+      # geri donebilirsiniz (bkz. README).
+      - key: EMBEDDING_MODEL_NAME
+        value: intfloat/multilingual-e5-small

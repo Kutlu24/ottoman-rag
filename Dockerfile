@@ -67,4 +67,9 @@ ENV KRAKEN_MODEL_DIR=$HOME/app/mcp-servers/htr-server/models \
 
 EXPOSE 7860
 
-CMD ["python", "-m", "uvicorn", "backend.main:app", "--host", "0.0.0.0", "--port", "7860", "--app-dir", "backend/src"]
+# Shell form (JSON-array degil) kasitli: $PORT genisletmesi icin bir kabuk
+# gerekiyor. HF Spaces sabit 7860 (app_port) bekler ve PORT ayarlamaz -
+# ${PORT:-7860} bu durumda 7860'a duser. Render (ve benzeri platformlar)
+# PORT'u dinamik olarak enjekte eder - ayni Dockerfile ikisinde de degisiklik
+# gerektirmeden calisir.
+CMD python -m uvicorn backend.main:app --host 0.0.0.0 --port ${PORT:-7860} --app-dir backend/src
