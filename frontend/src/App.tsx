@@ -1,9 +1,13 @@
 import { useState, type FormEvent } from "react";
 import { askQuestion, type AskResponse } from "./api";
 import { AnswerPanel } from "./components/AnswerPanel";
+import { IngestForm } from "./components/IngestForm";
 import "./App.css";
 
+type Tab = "ask" | "ingest";
+
 export default function App() {
+  const [tab, setTab] = useState<Tab>("ask");
   const [question, setQuestion] = useState("");
   const [manuscriptId, setManuscriptId] = useState("");
   const [result, setResult] = useState<AskResponse | null>(null);
@@ -36,27 +40,50 @@ export default function App() {
         </p>
       </header>
 
-      <form onSubmit={handleSubmit} className="ask-form">
-        <input
-          type="text"
-          placeholder="Yazma eser ID (opsiyonel, boş bırakılırsa tüm koleksiyonda arar)"
-          value={manuscriptId}
-          onChange={(e) => setManuscriptId(e.target.value)}
-        />
-        <textarea
-          placeholder="Sorunuzu buraya yazın..."
-          value={question}
-          onChange={(e) => setQuestion(e.target.value)}
-          rows={3}
-          required
-        />
-        <button type="submit" disabled={loading}>
-          {loading ? "Aranıyor..." : "Sor"}
+      <nav className="tabs">
+        <button
+          type="button"
+          className={tab === "ask" ? "tab active" : "tab"}
+          onClick={() => setTab("ask")}
+        >
+          Soru Sor
         </button>
-      </form>
+        <button
+          type="button"
+          className={tab === "ingest" ? "tab active" : "tab"}
+          onClick={() => setTab("ingest")}
+        >
+          Yeni Sayfa Ekle
+        </button>
+      </nav>
 
-      {error && <p className="error">{error}</p>}
-      {result && <AnswerPanel result={result} />}
+      {tab === "ask" ? (
+        <>
+          <form onSubmit={handleSubmit} className="ask-form">
+            <input
+              type="text"
+              placeholder="Yazma eser ID (opsiyonel, boş bırakılırsa tüm koleksiyonda arar)"
+              value={manuscriptId}
+              onChange={(e) => setManuscriptId(e.target.value)}
+            />
+            <textarea
+              placeholder="Sorunuzu buraya yazın..."
+              value={question}
+              onChange={(e) => setQuestion(e.target.value)}
+              rows={3}
+              required
+            />
+            <button type="submit" disabled={loading}>
+              {loading ? "Aranıyor..." : "Sor"}
+            </button>
+          </form>
+
+          {error && <p className="error">{error}</p>}
+          {result && <AnswerPanel result={result} />}
+        </>
+      ) : (
+        <IngestForm />
+      )}
     </div>
   );
 }

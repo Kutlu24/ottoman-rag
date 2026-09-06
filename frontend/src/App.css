@@ -119,3 +119,81 @@ header h1 {
   font-size: 0.8rem;
   color: #948b7d;
 }
+
+.tabs {
+  display: flex;
+  gap: 0.5rem;
+  margin-bottom: 1.25rem;
+}
+
+.tab {
+  font: inherit;
+  font-weight: 600;
+  padding: 0.5rem 1.1rem;
+  border: 1px solid #d8d1c4;
+  border-radius: 999px;
+  background: #fff;
+  color: #4a4237;
+  cursor: pointer;
+}
+
+.tab.active {
+  background: #8a5a2f;
+  border-color: #8a5a2f;
+  color: #fff;
+}
+
+.ingest-form {
+  display: flex;
+  flex-direction: column;
+  gap: 0.9rem;
+  background: #fff;
+  border: 1px solid #e3ddd2;
+  border-radius: 10px;
+  padding: 1.25rem;
+}
+
+.ingest-form label {
+  display: flex;
+  flex-direction: column;
+  gap: 0.3rem;
+  font-size: 0.85rem;
+  color: #4a4237;
+  font-weight: 600;
+}
+
+.ingest-form input {
+  font: inherit;
+  font-weight: 400;
+  padding: 0.55rem 0.7rem;
+  border: 1px solid #d8d1c4;
+  border-radius: 6px;
+}
+
+.field-row {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0.9rem;
+}
+
+.ingest-form button {
+  align-self: flex-start;
+  font: inherit;
+  font-weight: 600;
+  padding: 0.6rem 1.4rem;
+  border: none;
+  border-radius: 6px;
+  background: #8a5a2f;
+  color: #fff;
+  cursor: pointer;
+}
+
+.ingest-form button:disabled {
+  opacity: 0.6;
+  cursor: default;
+}
+
+.success {
+  color: #2e7d32;
+  font-weight: 500;
+}

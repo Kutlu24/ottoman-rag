@@ -57,3 +57,78 @@ export async function askQuestion(
 export function pageImageUrl(pageId: string): string {
   return `${API_BASE}/pages/${encodeURIComponent(pageId)}/image`;
 }
+
+export interface ManuscriptRef {
+  manuscript_id: string;
+  title?: string | null;
+  repository?: string | null;
+  shelfmark?: string | null;
+  date?: string | null;
+  collection?: string | null;
+  notes?: string | null;
+}
+
+export interface PageRef {
+  page_id: string;
+  manuscript_id: string;
+  folio_label?: string | null;
+  image_path: string;
+  image_width?: number | null;
+  image_height?: number | null;
+}
+
+export interface UploadImageResponse {
+  image_path: string;
+  image_width: number;
+  image_height: number;
+}
+
+async function handle<T>(res: Response): Promise<T> {
+  if (!res.ok) {
+    const text = await res.text();
+    throw new Error(`API hatası (${res.status}): ${text}`);
+  }
+  return res.json();
+}
+
+export async function uploadImage(file: File): Promise<UploadImageResponse> {
+  const form = new FormData();
+  form.append("file", file);
+  const res = await fetch(`${API_BASE}/upload-image`, { method: "POST", body: form });
+  return handle<UploadImageResponse>(res);
+}
+
+export async function createManuscript(manuscript: ManuscriptRef): Promise<ManuscriptRef> {
+  const res = await fetch(`${API_BASE}/manuscripts`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(manuscript),
+  });
+  return handle<ManuscriptRef>(res);
+}
+
+export async function createPage(page: PageRef): Promise<PageRef> {
+  const res = await fetch(`${API_BASE}/pages`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(page),
+  });
+  return handle<PageRef>(res);
+}
+
+export interface IngestResponse {
+  chunks_indexed: number;
+}
+
+export async function ingestPage(
+  manuscript: ManuscriptRef,
+  page: PageRef,
+  krakenModel?: string,
+): Promise<IngestResponse> {
+  const res = await fetch(`${API_BASE}/ingest`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ manuscript, page, kraken_model: krakenModel || null }),
+  });
+  return handle<IngestResponse>(res);
+}

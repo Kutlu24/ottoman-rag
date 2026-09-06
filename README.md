@@ -127,6 +127,14 @@ doğrular.
       ortamda yapılamadı (Claude-in-Chrome eklentisi bağlı değildi) — hem
       backend (`:8000`) hem frontend (`:5173`) çalışır durumda bırakıldı,
       elle kontrol edilebilir.
+- [x] Step 4b — `frontend`'e **"Yeni Sayfa Ekle"** sekmesi eklendi
+      (`IngestForm.tsx`): dosya seçip yazma/sayfa metadata'sı girerek
+      `POST /upload-image` (backend'e yeni eklendi, `Pillow` ile boyut
+      okuyup `data/raw_images/`'a kaydeder) → `/manuscripts` → `/pages` →
+      `/ingest` zincirini tetikler. Artık ham HTTP çağrıları veya
+      Transkribus'un kendi arayüzü gerekmeden, projenin kendi arayüzünden
+      uçtan uca yeni sayfa eklenebiliyor. `/upload-image` gerçek bir
+      dosyayla test edildi (doğru boyut: 785×2000 döndü).
 - [x] Step 5a — Gerçek görüntüyle uçtan uca Kraken testi, **dahil bir
       Windows subprocess deadlock'unun kök nedenine inilip çözülmesi:**
       - OpenITI'nin Kraken base modeli (`ottoman_best.mlmodel`, Zenodo

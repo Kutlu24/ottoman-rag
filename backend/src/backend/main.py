@@ -1,12 +1,16 @@
 from __future__ import annotations
 
+import re
+import uuid
 from contextlib import asynccontextmanager
+from pathlib import Path
 
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, HTTPException, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse
 from ottoman_rag_common.htr import HtrPageResult
 from ottoman_rag_common.provenance import ManuscriptRef, PageRef
+from PIL import Image
 from pydantic import BaseModel
 
 from ingestion.chunker import chunk_page
@@ -18,10 +22,15 @@ from .config import (
     HTR_KRAKEN_DIR,
     KRAKEN_DEFAULT_MODEL,
     KRAKEN_MODEL_DIR,
+    PROJECT_ROOT,
     SEARCH_SERVER_DIR,
 )
 from .mcp_clients import McpClientManager
 from .rag import AskResponse, answer_question
+
+RAW_IMAGES_DIR = PROJECT_ROOT / "data" / "raw_images"
+_SAFE_STEM = re.compile(r"[^a-zA-Z0-9_-]+")
+_ALLOWED_EXTENSIONS = {".jpg", ".jpeg", ".png", ".tif", ".tiff"}
 
 mcp_manager = McpClientManager()
 
@@ -98,6 +107,39 @@ def get_page_image(page_id: str) -> FileResponse:
     if page is None:
         raise HTTPException(status_code=404, detail="Sayfa bulunamadı")
     return FileResponse(page.image_path)
+
+
+class UploadImageResponse(BaseModel):
+    image_path: str
+    image_width: int
+    image_height: int
+
+
+@app.post("/upload-image", response_model=UploadImageResponse)
+async def upload_image(file: UploadFile) -> UploadImageResponse:
+    """Bir sayfa görüntüsünü sunucuya kaydeder; frontend'in "Yeni Sayfa
+    Ekle" formu bunu kullanır. Dönen image_path, /ingest'e verilecek yerel
+    yoldur."""
+    original = Path(file.filename or "sayfa")
+    ext = original.suffix.lower()
+    if ext not in _ALLOWED_EXTENSIONS:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Desteklenmeyen dosya türü: {ext or '(yok)'}. İzin verilenler: {sorted(_ALLOWED_EXTENSIONS)}",
+        )
+
+    safe_stem = _SAFE_STEM.sub("_", original.stem).strip("_") or "sayfa"
+    filename = f"{safe_stem}_{uuid.uuid4().hex[:8]}{ext}"
+
+    RAW_IMAGES_DIR.mkdir(parents=True, exist_ok=True)
+    dest = RAW_IMAGES_DIR / filename
+    content = await file.read()
+    dest.write_bytes(content)
+
+    with Image.open(dest) as img:
+        width, height = img.size
+
+    return UploadImageResponse(image_path=str(dest), image_width=width, image_height=height)
 
 
 class IngestRequest(BaseModel):
