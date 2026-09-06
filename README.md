@@ -127,36 +127,35 @@ doğrular.
       ortamda yapılamadı (Claude-in-Chrome eklentisi bağlı değildi) — hem
       backend (`:8000`) hem frontend (`:5173`) çalışır durumda bırakıldı,
       elle kontrol edilebilir.
-- [~] Step 5 — Gerçek görüntüyle uçtan uca test. **Kısmen tamamlandı, bir
-      açık sorun var:**
+- [x] Step 5a — Gerçek görüntüyle uçtan uca Kraken testi, **dahil bir
+      Windows subprocess deadlock'unun kök nedenine inilip çözülmesi:**
       - OpenITI'nin Kraken base modeli (`ottoman_best.mlmodel`, Zenodo
         7050342, 16.3 MB) indirildi → `mcp-servers/htr-server/models/`.
       - Wikimedia Commons'tan gerçek, kamu malı bir Osmanlıca belge
         indirildi (Sultan IV. Mehmed'in 1681 tarihli fermanı) → test amaçlı
         `data/raw_images/`.
-      - `htr_server.kraken_runner.run_kraken()` bu gerçek görüntü+model ile
-        **doğrudan çağrıldığında** başarıyla çalıştı: 98 satır segmentlendi,
-        24'ü boş olmayan metin içeriyordu, ortalama güven **0.504** — bu
-        belge süslü *divani* hatlı, tuğralı bir ferman olduğu için (model
-        ise basılı Osmanlıca üzerine eğitilmiş) düşük doğruluk beklenen bir
-        sonuç; pipeline'ın kendisi doğru çalışıyor.
-      - **Açık sorun:** aynı işlem `backend`'in `/ingest` uç noktası
-        üzerinden (yani `uvicorn → MCP stdio alt süreci (htr-kraken) →
-        kraken.exe alt süreci` şeklindeki iç içe süreç zinciri) çağrıldığında
-        tekrarlanabilir şekilde **donuyor** (CPU kullanımı sıfıra düşüp
-        uzun süre değişmiyor) — doğrudan çağrıda böyle bir sorun yok.
-        `--num-line-workers 0` ve stdout/stderr'i pipe yerine dosyaya
-        yönlendirme (`kraken_runner.py`'ye eklendi, bkz. son commit) bunu
-        çözmedi. Şüphe: Windows'ta 3+ seviye iç içe subprocess'te, MCP
-        stdio taşımasının pipe handle'ının en alttaki `kraken.exe`
-        alt sürecine sızıp hiç kapanmaması. Kalıcı çözüm için ya
-        `kraken_runner.py`'yi `asyncio.create_subprocess_exec` + açıkça
-        inherit edilemeyen (`close_fds`/handle listesi) pipe'larla yeniden
-        yazmak ya da self-hosted Kraken yolunda backend'in ayrı bir MCP
-        alt süreci yerine Kraken'i doğrudan (aynı process içinde) çağırması
-        gerekebilir.
-      - Transkribus üzerinden gerçek görüntüyle ingestion (300 tool'dan
-        doğru olanların keşfi) bu oturumda başlanmadı.
+      - **Bulunan hata:** `backend`'in `/ingest` uç noktası üzerinden (yani
+        `uvicorn → MCP stdio alt süreci (htr-kraken) → kraken.exe alt
+        süreci` zinciri) çağrıldığında iş tekrarlanabilir şekilde
+        donuyordu; doğrudan çağrıda sorun yoktu. **Kök neden:** htr-kraken
+        MCP sunucusunun kendi `stdin`'i, backend'e bağlı bir pipe (MCP
+        stdio protokolü); `subprocess.run`'da `stdin` belirtilmeyince
+        Windows bu pipe handle'ını `kraken.exe` alt sürecine miras
+        bırakıyor, o pipe'ın yazma ucu oturum boyunca hiç kapanmadığından
+        alt süreç sessizce sonsuza kadar bekliyordu. **Çözüm:**
+        `kraken_runner.py`'de `subprocess.run(..., stdin=subprocess.DEVNULL)`
+        açıkça belirtildi.
+      - Düzeltme sonrası gerçek `/ingest → /ask` zinciri gerçek görüntüyle
+        çalıştırıldı: OCR kalitesi zayıf çıktı (süslü *divani* hatlı,
+        tuğralı bir belge; model basılı Osmanlıca üzerine eğitilmiş,
+        ortalama güven 0.504) ama sistem **doğru davrandı** — Claude,
+        transkripsiyon çok bozuk olduğu için soruyu (fermanın kime ait
+        olduğu) güvenilir şekilde cevaplayamayacağını açıkça belirtti,
+        halüsinasyon yapmadı.
+- [ ] Step 5b — Transkribus üzerinden gerçek görüntüyle ingestion
+      (`@lazyants/transkribus-mcp-server`'ın 300 tool'undan doğru
+      olanların — upload/collection/process/htrId/page-xml — keşfi ve
+      entegrasyonu) henüz yapılmadı.
 
 ## Ortam kurulumu
 

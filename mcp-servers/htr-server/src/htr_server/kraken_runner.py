@@ -44,17 +44,27 @@ def run_kraken(image_path: str, model_path: str) -> HtrPageResult:
             "-x",
             "segment", "-bl",
             "ocr", "-m", str(model),
-            # --num-line-workers 0: satir cikarma isini multiprocessing worker
-            # process'lerine degil, ana process icinde yapar. Ic ice subprocess
-            # zincirlerinde (backend -> MCP server -> kraken) worker'larin
-            # stdout/stderr pipe handle'ini acik tutup ana process cikinca bile
-            # kapatmamasi, PIPE ile yakalanan cikti asla EOF almadigi icin
-            # subprocess.run'in sonsuza kadar beklemesine (deadlock) yol
-            # aciyordu. Ayni nedenle cikti PIPE yerine dosyaya yazdiriliyor.
+            # PyTorch/kraken'in kendi ic worker havuzlarini (num_workers vb.)
+            # tek surece indirir; asil deadlock nedeni asagidaki stdin
+            # duzeltmesiydi ama bu da ekstra guvenlik.
             "--num-line-workers", "0",
         ]
+        # KRITIK: stdin'i acikca DEVNULL'a baglamak gerekiyor. htr-kraken MCP
+        # sunucusu (bu kodun calistigi surec) kendi stdin'ini backend'e
+        # baglayan bir pipe (MCP stdio protokolu) uzerinden okuyor; stdin
+        # burada belirtilmezse subprocess.run bu PIPE handle'ini oldugu gibi
+        # kraken.exe alt surecine miras birakiyor (Windows'ta subprocess,
+        # stdin=None oldugunda mevcut stdin handle'ini acikca inherit-edilebilir
+        # yapip child'a geciriyor). O pipe'in yazma ucu MCP oturumu boyunca
+        # acik kaldigindan hicbir zaman EOF gelmiyor; kraken/torch bunu
+        # (multiprocessing/dataloader ic mekanizmalarinda) beklerken tum
+        # cagri backend -> MCP -> kraken zincirinde sessizce donuyordu.
+        # Dogrudan (MCP disinda) calistirilan cagrilarda stdin normal bir
+        # konsol/dosya handle'i oldugundan bu sorun hic gorulmuyordu.
         with open(stderr_path, "w", encoding="utf-8") as stderr_file:
-            result = subprocess.run(cmd, stdout=stderr_file, stderr=subprocess.STDOUT)
+            result = subprocess.run(
+                cmd, stdin=subprocess.DEVNULL, stdout=stderr_file, stderr=subprocess.STDOUT
+            )
 
         stderr_text = stderr_path.read_text(encoding="utf-8", errors="replace")
 
