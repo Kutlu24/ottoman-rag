@@ -42,3 +42,17 @@ KRAKEN_MODEL_DIR = _resolve_path(
     os.environ.get("KRAKEN_MODEL_DIR", ""), PROJECT_ROOT / "mcp-servers" / "htr-server" / "models"
 )
 KRAKEN_DEFAULT_MODEL = os.environ.get("KRAKEN_DEFAULT_MODEL", "")
+
+# Yuklenen sayfa gorselleri. Kalici depolama gerektiren tek "kullanici
+# verisi" dizinlerinden biri (digerleri: CHROMA_DB_DIR, METADATA_DB_PATH) -
+# HF Spaces gibi ortamlarda /data altindaki kalici bir yola yonlendirilmeli.
+RAW_IMAGES_DIR = Path(
+    _resolve_path(os.environ.get("RAW_IMAGES_DIR", ""), PROJECT_ROOT / "data" / "raw_images")
+)
+
+# Bos birakilirsa (yerel gelistirmede oldugu gibi) Basic Auth devre disi
+# kalir; production'da (HF Spaces secrets) mutlaka doldurulmali - aksi
+# halde ANTHROPIC_API_KEY gercek para harcayan, herkese acik bir uc nokta
+# arkasinda korumasiz kalir.
+BASIC_AUTH_USER = os.environ.get("BASIC_AUTH_USER", "")
+BASIC_AUTH_PASSWORD = os.environ.get("BASIC_AUTH_PASSWORD", "")

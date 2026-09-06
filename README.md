@@ -1,3 +1,13 @@
+---
+title: Ottoman Manuscript RAG
+emoji: 📜
+colorFrom: yellow
+colorTo: red
+sdk: docker
+app_port: 7860
+pinned: false
+---
+
 # Osmanlıca El Yazması RAG Sistemi
 
 *[🇬🇧 English overview below](#english-overview) · Detaylı içerik ve geliştirme
@@ -72,6 +82,46 @@ project's design decisions.
 verified end-to-end with real data on both backends' happy paths; Transkribus's
 automated image-upload step is not yet wired up (see "Step 5b" below). License: no
 license file yet — treat as all-rights-reserved until one is added.
+
+### Deploying to Hugging Face Spaces (Docker, password-protected, persistent storage)
+
+The repo root `Dockerfile` builds the frontend and backend into a single container
+that serves everything on one port (`7860`) — no separate frontend host needed. The
+YAML block at the very top of this file is the Space's config (`sdk: docker`).
+
+1. **Create the Space:** [huggingface.co/new-space](https://huggingface.co/new-space) →
+   SDK: **Docker** → Space hardware: free **CPU basic** is enough to start.
+2. **Enable persistent storage** (Space Settings → *Storage*): attach a small
+   storage bucket, mounted at `/data`. This is the one part that isn't free, but a
+   small bucket is inexpensive — without it, uploaded manuscripts, the vector index,
+   and the catalog are wiped on every restart.
+3. **Add secrets** (Space Settings → *Variables and secrets*):
+   | Name | Value |
+   |---|---|
+   | `ANTHROPIC_API_KEY` | your Anthropic API key |
+   | `BASIC_AUTH_USER` | a username you choose |
+   | `BASIC_AUTH_PASSWORD` | a password you choose |
+   | `CHROMA_DB_DIR` | `/data/chroma` |
+   | `METADATA_DB_PATH` | `/data/metadata.db` |
+   | `RAW_IMAGES_DIR` | `/data/raw_images` |
+
+   Leaving `BASIC_AUTH_USER` unset disables auth entirely (fine for local dev, **not**
+   for a public Space — `ANTHROPIC_API_KEY` spends real money on every request).
+4. **Push this repo to the Space:**
+   ```bash
+   git remote add space https://huggingface.co/spaces/<your-username>/<space-name>
+   git push space master
+   ```
+   HF builds the Docker image server-side — no local Docker install needed. Note
+   that this pushes this file (`README.md`) too, which will overwrite whatever HF
+   auto-generated for the Space when you created it; that's expected, since the
+   frontmatter above already has the fields the Space needs.
+5. Once the build finishes, visit the Space URL and log in with the
+   `BASIC_AUTH_USER` / `BASIC_AUTH_PASSWORD` you set.
+
+Kraken OCR is CPU-only and slow (~1–2 min/page on modest hardware) — expect the same
+on a free CPU Space. Transkribus remains the faster option once its upload step is
+wired up (see "Step 5b").
 
 ---
 
@@ -257,6 +307,31 @@ doğrular.
         "Ottoman Fatwa Manuscripts" (htrId 169801) ile çalıştırmak, sonra
         sadece iyi belgelenmiş okuma tarafını (`page_get_curr_transcript`/
         `doc_export`) entegre etmek — otomatik upload'ı ertelemek.
+- [x] Step 6 — **Hugging Face Spaces deploy'a hazırlık** (Docker, kalıcı
+      depolama, Basic Auth). Küçük bir kullanıcı grubu (siz + birkaç kişi)
+      için tam işlevsel (salt-okunur değil) bir deploy hedeflendi:
+      - Kök `Dockerfile` — çok aşamalı build: frontend (`node:20-slim`)
+        derlenip statik dosyalar backend imajına kopyalanıyor; tek image,
+        tek port (`7860`), Node.js runtime'da gerekmiyor (Transkribus henüz
+        backend'e bağlı değil, bkz. Step 5b).
+      - `backend/main.py`'ye `BasicAuthMiddleware` eklendi — `BASIC_AUTH_USER`
+        boşsa (yerel geliştirme) devre dışı, doluysa tüm uygulamayı (API +
+        statik frontend) korur. Gerçek kimlik bilgileriyle test edildi:
+        bilgisiz istek 401, doğru bilgiyle 200 döndü.
+      - Frontend production'da backend ile aynı origin'den `StaticFiles`
+        ile servis ediliyor (`frontend/api.ts`'in varsayılan `API_BASE`'i
+        artık boş string = relative istek; yerel geliştirme için
+        `frontend/.env`'de `VITE_API_BASE` açıkça ayarlandı).
+      - `RAW_IMAGES_DIR` artık (`CHROMA_DB_DIR`/`METADATA_DB_PATH` gibi) env
+        değişkeninden okunuyor — HF'nin kalıcı depolaması (`/data`) altına
+        yönlendirilebilsin diye.
+      - Kraken modeli ve embedding modeli (~1GB) runtime'da değil Docker
+        build'inde indirilip önbelleğe alınıyor (soğuk başlangıçta yavaşlık
+        olmasın diye).
+      - Gerçek Docker build'i bu ortamda test edilemedi (Docker kurulu
+        değil) — HF'nin kendi build sunucularında denenecek. Adım adım
+        deploy talimatı yukarıdaki "Deploying to Hugging Face Spaces"
+        (İngilizce) bölümünde.
 
 ## Ortam kurulumu
 

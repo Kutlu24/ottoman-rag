@@ -31,7 +31,11 @@ export interface AskResponse {
   usage: Usage | null;
 }
 
-const API_BASE = import.meta.env.VITE_API_BASE ?? "http://localhost:8000";
+// Production'da (HF Spaces) frontend backend ile ayni origin'den servis
+// edilir, bu yuzden bos string (relative istek) dogru varsayilan.
+// Yerel gelistirmede ayri bir Vite dev sunucusu kullanildigindan
+// frontend/.env icinde VITE_API_BASE=http://localhost:8000 tanimlanir.
+const API_BASE = import.meta.env.VITE_API_BASE ?? "";
 
 export async function askQuestion(
   question: string,

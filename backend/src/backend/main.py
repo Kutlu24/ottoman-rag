@@ -1,37 +1,44 @@
 from __future__ import annotations
 
+import base64
 import re
+import secrets
 import sys
 import uuid
 from contextlib import asynccontextmanager
 from pathlib import Path
 
-from fastapi import FastAPI, HTTPException, UploadFile
+from fastapi import FastAPI, HTTPException, Request, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import FileResponse
+from fastapi.responses import FileResponse, Response
+from fastapi.staticfiles import StaticFiles
 from ottoman_rag_common.htr import HtrPageResult
 from ottoman_rag_common.provenance import ManuscriptRef, PageRef
 from PIL import Image
 from pydantic import BaseModel
+from starlette.middleware.base import BaseHTTPMiddleware
 
 from ingestion.chunker import chunk_page
 
 from . import store
 from .config import (
+    BASIC_AUTH_PASSWORD,
+    BASIC_AUTH_USER,
     CHROMA_DB_DIR,
     EMBEDDING_MODEL_NAME,
     HTR_KRAKEN_DIR,
     KRAKEN_DEFAULT_MODEL,
     KRAKEN_MODEL_DIR,
     PROJECT_ROOT,
+    RAW_IMAGES_DIR,
     SEARCH_SERVER_DIR,
 )
 from .mcp_clients import McpClientManager
 from .rag import AskResponse, answer_question
 
-RAW_IMAGES_DIR = PROJECT_ROOT / "data" / "raw_images"
 _SAFE_STEM = re.compile(r"[^a-zA-Z0-9_-]+")
 _ALLOWED_EXTENSIONS = {".jpg", ".jpeg", ".png", ".tif", ".tiff"}
+FRONTEND_DIST_DIR = PROJECT_ROOT / "frontend" / "dist"
 
 mcp_manager = McpClientManager()
 
@@ -63,11 +70,42 @@ async def lifespan(app: FastAPI):
         await mcp_manager.stop_all()
 
 
+class BasicAuthMiddleware(BaseHTTPMiddleware):
+    """HTTP Basic Auth ile tum uygulamayi (API + statik frontend) korur.
+
+    BASIC_AUTH_USER bos ise (varsayilan, yerel gelistirme) auth tamamen
+    devre disi kalir. Production'da (HF Spaces secrets) doldurulmasi
+    zorunlu - ANTHROPIC_API_KEY gercek para harcadigindan herkese acik,
+    korumasiz birakilmamali.
+    """
+
+    async def dispatch(self, request: Request, call_next):
+        if not BASIC_AUTH_USER:
+            return await call_next(request)
+
+        auth_header = request.headers.get("authorization", "")
+        if auth_header.startswith("Basic "):
+            try:
+                decoded = base64.b64decode(auth_header[6:]).decode("utf-8")
+                user, _, password = decoded.partition(":")
+            except Exception:
+                user, password = "", ""
+            if secrets.compare_digest(user, BASIC_AUTH_USER) and secrets.compare_digest(
+                password, BASIC_AUTH_PASSWORD
+            ):
+                return await call_next(request)
+
+        return Response(status_code=401, headers={"WWW-Authenticate": 'Basic realm="ottoman-rag"'})
+
+
 app = FastAPI(title="Osmanlıca El Yazması RAG API", lifespan=lifespan)
 
+app.add_middleware(BasicAuthMiddleware)
+
 # Dev ortamında frontend (Vite, :5173) farklı origin'den backend'e (:8000)
-# istek atar; bu proje tek kullanıcılı bir araştırma aracı olduğu için
-# geniş bir origin listesi kabul edilebilir - üretime taşınırsa daraltılmalı.
+# istek atar; production'da frontend ayni origin'den (statik dosya olarak)
+# servis edildigi icin CORS devreye girmez, bu yuzden dev origin'lerini
+# sabit birakmak zararsiz.
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["http://localhost:5173", "http://127.0.0.1:5173"],
@@ -186,3 +224,11 @@ async def ingest(req: IngestRequest) -> IngestResponse:
         "index_chunks", {"chunks": [c.model_dump(mode="json") for c in chunks]}
     )
     return IngestResponse(chunks_indexed=indexed)
+
+
+# Statik frontend build'i (varsa) en sonda mount edilir - butun API
+# rotalarindan SONRA tanimlanmali ki once onlar eslessin. HF Spaces gibi
+# tek-port ortamlarda frontend'i ayri bir Node sureciyle degil, dogrudan
+# bu FastAPI uygulamasindan servis ederiz (bkz. Dockerfile).
+if FRONTEND_DIST_DIR.exists():
+    app.mount("/", StaticFiles(directory=str(FRONTEND_DIST_DIR), html=True), name="frontend")
