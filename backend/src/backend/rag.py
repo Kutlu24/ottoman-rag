@@ -42,9 +42,27 @@ class Citation(BaseModel):
     quote: str
 
 
+# $/milyon token (input, output) - sadece bu projede kullanilmasi beklenen
+# modeller icin; bilinmeyen bir model icin maliyet tahmini yapilmaz.
+_PRICING_PER_MTOK: dict[str, tuple[float, float]] = {
+    "claude-haiku-4-5-20251001": (1.00, 5.00),
+    "claude-haiku-4-5": (1.00, 5.00),
+    "claude-sonnet-5": (2.00, 10.00),
+    "claude-opus-5": (5.00, 25.00),
+}
+
+
+class Usage(BaseModel):
+    model: str
+    input_tokens: int
+    output_tokens: int
+    estimated_cost_usd: float | None = None
+
+
 class AskResponse(BaseModel):
     answer: str
     citations: list[Citation]
+    usage: Usage | None = None
 
 
 _ANSWER_TOOL = {
@@ -120,13 +138,19 @@ async def answer_question(
     client = get_anthropic_client()
     message = client.messages.create(
         model=ANTHROPIC_MODEL,
-        max_tokens=1024,
+        max_tokens=2048,
         tools=[_ANSWER_TOOL],
         tool_choice={"type": "tool", "name": "provide_answer"},
         messages=[{"role": "user", "content": prompt}],
     )
     tool_use = next(b for b in message.content if b.type == "tool_use")
     payload = tool_use.input
+
+    in_tok = message.usage.input_tokens
+    out_tok = message.usage.output_tokens
+    pricing = _PRICING_PER_MTOK.get(ANTHROPIC_MODEL)
+    cost = (in_tok / 1_000_000 * pricing[0] + out_tok / 1_000_000 * pricing[1]) if pricing else None
+    usage = Usage(model=ANTHROPIC_MODEL, input_tokens=in_tok, output_tokens=out_tok, estimated_cost_usd=cost)
 
     citations: list[Citation] = []
     for c in payload.get("citations", []):
@@ -150,4 +174,4 @@ async def answer_question(
             )
         )
 
-    return AskResponse(answer=payload.get("answer", ""), citations=citations)
+    return AskResponse(answer=payload.get("answer", ""), citations=citations, usage=usage)

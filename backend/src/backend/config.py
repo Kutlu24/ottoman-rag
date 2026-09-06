@@ -10,7 +10,9 @@ PROJECT_ROOT = Path(__file__).resolve().parents[3]
 load_dotenv(PROJECT_ROOT / ".env")
 
 ANTHROPIC_API_KEY = os.environ.get("ANTHROPIC_API_KEY", "")
-ANTHROPIC_MODEL = os.environ.get("ANTHROPIC_MODEL", "claude-sonnet-5")
+# Haiku 4.5: en ucuz mevcut Claude modeli ($1/$5 per MTok) - bu projenin
+# kisa, retrieval ile sinirli prompt'lari icin maliyet/kalite dengesi iyi.
+ANTHROPIC_MODEL = os.environ.get("ANTHROPIC_MODEL", "claude-haiku-4-5-20251001")
 
 METADATA_DB_PATH = Path(
     os.environ.get("METADATA_DB_PATH", str(PROJECT_ROOT / "data" / "metadata.db"))
