@@ -37,17 +37,18 @@ COPY --chown=user mcp-servers/search-server ./mcp-servers/search-server
 COPY --chown=user ingestion ./ingestion
 COPY --chown=user backend ./backend
 
-# torch, TEK bir pip cagrisinda --extra-index-url ile acikca CPU surumune
-# ("+cpu" local surum etiketiyle) sabitlenip diger tum paketlerle BIRLIKTE
-# kuruluyor. Once torch'u ayri bir RUN'da kurup sonra kraken'i (ve onun
-# torch bagimliligini) ayri bir RUN'da kurmak, ikinci adimin torch'u
-# sessizce varsayilan PyPI'daki CUDA'li surume (nvidia-*, triton gibi
-# gigabaytlarca gereksiz paketle) yukseltmesine yol aciyordu - bu da 512MB
-# ucretsiz Render limitinde derhal OOM'a neden oluyordu. Tek cagrida
-# coz(um)lenince boyle bir "sonradan yukseltme" sansi kalmiyor.
+# torch icin acik bir surum+etiket sabitlemesi (ör. torch==2.14.0+cpu)
+# denendi ama kraken'in kendi surum araligiyla (bazi kraken surumleri
+# torch<=2.9 istiyor) cakisip "ResolutionImpossible" hatasi verdi. Bunun
+# yerine, bu makinede DOGAL pip cozumlemesinin (hicbir sabitleme olmadan)
+# zaten kendiliginden indigi surume (torch 2.14.0) guvenip sadece CPU
+# tekerleklerini ek bir kaynak olarak sunuyoruz - PEP 440'a gore "+cpu"
+# etiketli bir surum, ayni sürüm numarali etiketsiz (CUDA'li) surumden
+# daha yuksek onceliklidir, bu yuzden pip kendiliginden CPU surumunu
+# tercih eder, TEK pip cagrisinda (ayri bir adimin sonradan CUDA'li
+# surume yukseltmesine firsat kalmadan - asil OOM nedeni buydu).
 RUN pip install --no-cache-dir --user \
       --extra-index-url https://download.pytorch.org/whl/cpu \
-      "torch==2.14.0+cpu" \
       -e ./packages/ottoman_rag_common \
       -e ./mcp-servers/htr-server \
       -e ./mcp-servers/search-server \
