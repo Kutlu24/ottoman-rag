@@ -213,7 +213,9 @@ async def ingest(req: IngestRequest) -> IngestResponse:
 
     htr_client = mcp_manager.get("htr-kraken")
     raw_result = await htr_client.call_tool(
-        "run_htr", {"image_path": req.page.image_path, "model_name": req.kraken_model}
+        "run_htr",
+        {"image_path": req.page.image_path, "model_name": req.kraken_model},
+        timeout=600,  # Kraken CPU'da yavas olabilir; sunucuyu sonsuza kadar kilitlemesin
     )
     htr_result = HtrPageResult.model_validate(raw_result)
 

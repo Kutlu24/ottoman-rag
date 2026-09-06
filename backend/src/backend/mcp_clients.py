@@ -9,6 +9,7 @@ yavas olurdu.
 
 from __future__ import annotations
 
+import asyncio
 import json
 import os
 from contextlib import AsyncExitStack
@@ -44,11 +45,30 @@ class McpServerClient:
     async def stop(self) -> None:
         await self._stack.aclose()
 
-    async def call_tool(self, tool_name: str, arguments: dict[str, Any]) -> Any:
+    async def call_tool(
+        self, tool_name: str, arguments: dict[str, Any], timeout: float | None = None
+    ) -> Any:
         if self.session is None:
             raise RuntimeError(f"{self.name} MCP client henüz başlatılmadı")
 
-        result = await self.session.call_tool(tool_name, arguments)
+        # timeout olmadan asagidaki cagri (ör. yavas bir Kraken calismasi)
+        # sonsuza kadar bekleyebilir - tek is parcacikli asyncio event
+        # loop'unda bu, SADECE bu istegi degil, ayni sunucudaki TUM diger
+        # istekleri de (ilgisiz olanlar dahil) donduruyordu. wait_for,
+        # makul bir sinir koyup asilirsa duzgun bir hata dondurur.
+        try:
+            if timeout is not None:
+                result = await asyncio.wait_for(
+                    self.session.call_tool(tool_name, arguments), timeout=timeout
+                )
+            else:
+                result = await self.session.call_tool(tool_name, arguments)
+        except TimeoutError:
+            raise RuntimeError(
+                f"{self.name}.{tool_name} {timeout} saniye içinde tamamlanmadı (zaman aşımı). "
+                "Sunucu aşırı yüklenmiş olabilir; diğer uygulamaları kapatıp tekrar deneyin."
+            ) from None
+
         if result.isError:
             raise RuntimeError(f"{self.name}.{tool_name} hata döndürdü: {result.content}")
 
