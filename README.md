@@ -152,10 +152,25 @@ doğrular.
         transkripsiyon çok bozuk olduğu için soruyu (fermanın kime ait
         olduğu) güvenilir şekilde cevaplayamayacağını açıkça belirtti,
         halüsinasyon yapmadı.
-- [ ] Step 5b — Transkribus üzerinden gerçek görüntüyle ingestion
-      (`@lazyants/transkribus-mcp-server`'ın 300 tool'undan doğru
-      olanların — upload/collection/process/htrId/page-xml — keşfi ve
-      entegrasyonu) henüz yapılmadı.
+- [~] Step 5b — Transkribus keşfi. **Kısmen tamamlandı:**
+      - Gerçek `TRANSKRIBUS_USER`/`PASSWORD` ile `@lazyants/transkribus-mcp-server`'a
+        bağlanıp 300 tool'u listeledik — kimlik doğrulama çalışıyor.
+      - Akış haritalandı: `transkribus_coll_create` (koleksiyon) →
+        `transkribus_upload_create_structure` + `transkribus_upload_page`
+        (görüntü yükleme) → `transkribus_job_create` (HTR job, `type` +
+        muhtemelen htrId) → `transkribus_job_get` (durum) →
+        `transkribus_page_get_curr_transcript` / `transkribus_doc_export`
+        (PAGE XML sonucu). Bu son dört tool'un JSON şeması net ve tipli.
+      - **Tıkanılan nokta:** `transkribus_upload_page`'in `pageData`
+        parametresi şemasız (`additionalProperties: {}}`); gerçek beklenen
+        alanlar (base64 görüntü mü, ayrı bir istek mi) ne resmi Transkribus
+        dokümantasyonunda ne sarmalayıcının kaynağında net. Canlı/kotalı
+        API'ye kör tahminle denemek yerine burada durduk.
+      - **Önerilen sonraki adım:** görüntü yükleme adımını otomatikleştirmek
+        yerine bir test sayfasını Transkribus web arayüzünden elle yükleyip
+        "Ottoman Fatwa Manuscripts" (htrId 169801) ile çalıştırmak, sonra
+        sadece iyi belgelenmiş okuma tarafını (`page_get_curr_transcript`/
+        `doc_export`) entegre etmek — otomatik upload'ı ertelemek.
 
 ## Ortam kurulumu
 
