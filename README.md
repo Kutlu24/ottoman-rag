@@ -113,9 +113,12 @@ doğrular.
       `ingestion/chunker.py` + `mcp-servers/search-server` — canlı ortamda
       doğrulandı (sentetik veriyle uçtan uca)
 - [x] Step 3 — `backend/` (FastAPI + RAG orchestrator + SQLite metadata store) —
-      gerçek `uvicorn` sunucusu + gerçek MCP (stdio) client bağlantısıyla
-      doğrulandı; `/ask` sadece `ANTHROPIC_API_KEY` eksikliğinden bekleneni
-      verdi, retrieval zinciri tam çalışıyor
+      gerçek `ANTHROPIC_API_KEY` ile uçtan uca doğrulandı: `/ask` doğru,
+      halüsinasyonsuz bir cevap (pasajda yeterli bilgi yoksa bunu açıkça
+      belirtiyor) + tam provenance (`citation_label`, `bboxes`, `image_path`)
+      döndürdü. Model **Haiku 4.5**; ölçülen gerçek maliyet **soru başına
+      ~$0.0024** (1222 giriş + 244 çıkış token) — 5 dolarlık kredi ~2000
+      soruya denk geliyor.
 - [ ] Step 4 — `frontend/` (viewer + highlight overlay)
 - [ ] Step 5 — `training/` (Kraken fine-tuning, opsiyonel)
 
