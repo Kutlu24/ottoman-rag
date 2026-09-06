@@ -33,7 +33,9 @@ RUN pip install --no-cache-dir --upgrade pip
 
 # CPU-only torch onceden kurulur ki kraken'in kendi bagimliligi CUDA'li
 # bir surumu cekmeye calismasin (image boyutu + build suresi icin onemli).
-RUN pip install --no-cache-dir --user torch --index-url https://download.pytorch.org/whl/cpu
+# Surum, bu makinede dogrulanmis calisan kombinasyonla eslesecek sekilde
+# sabitlendi (bkz. search-server/pyproject.toml'daki transformers notu).
+RUN pip install --no-cache-dir --user torch==2.14.0 --index-url https://download.pytorch.org/whl/cpu
 
 COPY --chown=user packages/ottoman_rag_common ./packages/ottoman_rag_common
 COPY --chown=user mcp-servers/htr-server ./mcp-servers/htr-server

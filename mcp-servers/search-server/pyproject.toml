@@ -6,7 +6,12 @@ requires-python = ">=3.10"
 dependencies = [
     "mcp[cli]>=1.2.0,<2.0.0",
     "chromadb>=0.5.0",
-    "sentence-transformers>=3.0.0",
+    # Bu ikili bu makinede dogrulanmis sekilde calisiyor; guncel PyPI
+    # surumleri arasinda transformers'in PreTrainedModel'i tasidigi/kaldirdigi
+    # bir uyumsuzluk var (sentence-transformers -> transformers import
+    # hatasi), bu yuzden acikca sabitleniyor.
+    "sentence-transformers==6.0.1",
+    "transformers==5.16.1",
     "pydantic>=2.0",
     # Once ayri kurulmali:
     #   pip install -e ../../packages/ottoman_rag_common
