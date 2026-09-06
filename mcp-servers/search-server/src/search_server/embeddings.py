@@ -8,14 +8,23 @@ soyutlaniyor, cagiran kod sadece is_query bayragini veriyor.
 from __future__ import annotations
 
 import os
+from typing import TYPE_CHECKING
 
-from sentence_transformers import SentenceTransformer
+if TYPE_CHECKING:
+    from sentence_transformers import SentenceTransformer
 
 _MODEL_NAME = os.environ.get("EMBEDDING_MODEL_NAME", "intfloat/multilingual-e5-base")
-_model: SentenceTransformer | None = None
+_model: "SentenceTransformer | None" = None
 
 
-def get_model() -> SentenceTransformer:
+def get_model() -> "SentenceTransformer":
+    # Import burada, fonksiyon icinde: sentence_transformers -> torch'u
+    # modul yuklenirken degil, ilk gercek embedding cagrisinda yukler.
+    # search-server MCP alt sureci sadece acilirken (henuz hicbir sorgu
+    # gelmeden) torch'u belleğe almasin diye - kucuk bellekli ortamlarda
+    # (ör. Render'in ucretsiz 512MB'i) baslangicta OOM riskini azaltir.
+    from sentence_transformers import SentenceTransformer
+
     global _model
     if _model is None:
         _model = SentenceTransformer(_MODEL_NAME)

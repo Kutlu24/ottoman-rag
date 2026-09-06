@@ -31,19 +31,23 @@ WORKDIR $HOME/app
 
 RUN pip install --no-cache-dir --upgrade pip
 
-# CPU-only torch onceden kurulur ki kraken'in kendi bagimliligi CUDA'li
-# bir surumu cekmeye calismasin (image boyutu + build suresi icin onemli).
-# Surum, bu makinede dogrulanmis calisan kombinasyonla eslesecek sekilde
-# sabitlendi (bkz. search-server/pyproject.toml'daki transformers notu).
-RUN pip install --no-cache-dir --user torch==2.14.0 --index-url https://download.pytorch.org/whl/cpu
-
 COPY --chown=user packages/ottoman_rag_common ./packages/ottoman_rag_common
 COPY --chown=user mcp-servers/htr-server ./mcp-servers/htr-server
 COPY --chown=user mcp-servers/search-server ./mcp-servers/search-server
 COPY --chown=user ingestion ./ingestion
 COPY --chown=user backend ./backend
 
+# torch, TEK bir pip cagrisinda --extra-index-url ile acikca CPU surumune
+# ("+cpu" local surum etiketiyle) sabitlenip diger tum paketlerle BIRLIKTE
+# kuruluyor. Once torch'u ayri bir RUN'da kurup sonra kraken'i (ve onun
+# torch bagimliligini) ayri bir RUN'da kurmak, ikinci adimin torch'u
+# sessizce varsayilan PyPI'daki CUDA'li surume (nvidia-*, triton gibi
+# gigabaytlarca gereksiz paketle) yukseltmesine yol aciyordu - bu da 512MB
+# ucretsiz Render limitinde derhal OOM'a neden oluyordu. Tek cagrida
+# coz(um)lenince boyle bir "sonradan yukseltme" sansi kalmiyor.
 RUN pip install --no-cache-dir --user \
+      --extra-index-url https://download.pytorch.org/whl/cpu \
+      "torch==2.14.0+cpu" \
       -e ./packages/ottoman_rag_common \
       -e ./mcp-servers/htr-server \
       -e ./mcp-servers/search-server \
