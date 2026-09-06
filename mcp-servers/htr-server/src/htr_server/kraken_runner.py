@@ -36,6 +36,7 @@ def run_kraken(image_path: str, model_path: str) -> HtrPageResult:
 
     with tempfile.TemporaryDirectory() as tmpdir:
         output_xml = Path(tmpdir) / f"{image.stem}.xml"
+        stderr_path = Path(tmpdir) / "stderr.log"
 
         cmd = [
             "kraken",
@@ -43,15 +44,26 @@ def run_kraken(image_path: str, model_path: str) -> HtrPageResult:
             "-x",
             "segment", "-bl",
             "ocr", "-m", str(model),
+            # --num-line-workers 0: satir cikarma isini multiprocessing worker
+            # process'lerine degil, ana process icinde yapar. Ic ice subprocess
+            # zincirlerinde (backend -> MCP server -> kraken) worker'larin
+            # stdout/stderr pipe handle'ini acik tutup ana process cikinca bile
+            # kapatmamasi, PIPE ile yakalanan cikti asla EOF almadigi icin
+            # subprocess.run'in sonsuza kadar beklemesine (deadlock) yol
+            # aciyordu. Ayni nedenle cikti PIPE yerine dosyaya yazdiriliyor.
+            "--num-line-workers", "0",
         ]
-        result = subprocess.run(cmd, capture_output=True, text=True)
+        with open(stderr_path, "w", encoding="utf-8") as stderr_file:
+            result = subprocess.run(cmd, stdout=stderr_file, stderr=subprocess.STDOUT)
+
+        stderr_text = stderr_path.read_text(encoding="utf-8", errors="replace")
 
         if result.returncode != 0:
             raise KrakenError(
-                f"kraken çalıştırılırken hata oluştu (exit {result.returncode}):\n{result.stderr}"
+                f"kraken çalıştırılırken hata oluştu (exit {result.returncode}):\n{stderr_text}"
             )
         if not output_xml.exists():
-            raise KrakenError(f"kraken çıktı üretmedi, stderr:\n{result.stderr}")
+            raise KrakenError(f"kraken çıktı üretmedi, log:\n{stderr_text}")
 
         htr_run = HtrRun(
             htr_run_id=str(uuid.uuid4()),

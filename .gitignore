@@ -12,4 +12,5 @@ data/page_xml/
 data/chroma/
 *.db
 *.tsbuildinfo
+.claude/
 .DS_Store
