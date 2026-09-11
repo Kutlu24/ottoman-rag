@@ -32,6 +32,19 @@ export default function App() {
     }
   }
 
+  // "Add New Page" basariyla bittiginde otomatik olarak bu sayfaya, o
+  // belgeye onceden doldurulmus (scoped) sekilde gecer - onceden bu iki
+  // sekme arasinda hicbir bag yoktu: bir arastirmaci belge yukleyip hemen
+  // ardindan soru sordugunda, bos Manuscript ID alani TUM koleksiyonu
+  // ariyordu ve alakasiz eski/test verisi dondurebiliyordu (gercek bir
+  // kullanici raporuyla dogrulandi, 2026-09).
+  function handleIngested(newManuscriptId: string) {
+    setManuscriptId(newManuscriptId);
+    setResult(null);
+    setError(null);
+    setTab("ask");
+  }
+
   return (
     <div className="app">
       <div className="lang-switch">
@@ -98,7 +111,7 @@ export default function App() {
           {result && <AnswerPanel result={result} />}
         </>
       ) : (
-        <IngestForm />
+        <IngestForm onIngested={handleIngested} />
       )}
     </div>
   );

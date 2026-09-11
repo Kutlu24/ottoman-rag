@@ -347,25 +347,10 @@ altyapınıza deploy edip `KRAKEN_DEVICE=cuda:0` ayarlamanız gerekir.
         transkripsiyon çok bozuk olduğu için soruyu (fermanın kime ait
         olduğu) güvenilir şekilde cevaplayamayacağını açıkça belirtti,
         halüsinasyon yapmadı.
-- [~] Step 5b — Transkribus keşfi. **Kısmen tamamlandı:**
-      - Gerçek `TRANSKRIBUS_USER`/`PASSWORD` ile `@lazyants/transkribus-mcp-server`'a
-        bağlanıp 300 tool'u listeledik — kimlik doğrulama çalışıyor.
-      - Akış haritalandı: `transkribus_coll_create` (koleksiyon) →
-        `transkribus_upload_create_structure` + `transkribus_upload_page`
-        (görüntü yükleme) → `transkribus_job_create` (HTR job, `type` +
-        muhtemelen htrId) → `transkribus_job_get` (durum) →
-        `transkribus_page_get_curr_transcript` / `transkribus_doc_export`
-        (PAGE XML sonucu). Bu son dört tool'un JSON şeması net ve tipli.
-      - **Tıkanılan nokta:** `transkribus_upload_page`'in `pageData`
-        parametresi şemasız (`additionalProperties: {}}`); gerçek beklenen
-        alanlar (base64 görüntü mü, ayrı bir istek mi) ne resmi Transkribus
-        dokümantasyonunda ne sarmalayıcının kaynağında net. Canlı/kotalı
-        API'ye kör tahminle denemek yerine burada durduk.
-      - **Önerilen sonraki adım:** görüntü yükleme adımını otomatikleştirmek
-        yerine bir test sayfasını Transkribus web arayüzünden elle yükleyip
-        "Ottoman Fatwa Manuscripts" (htrId 169801) ile çalıştırmak, sonra
-        sadece iyi belgelenmiş okuma tarafını (`page_get_curr_transcript`/
-        `doc_export`) entegre etmek — otomatik upload'ı ertelemek.
+- [~] Step 5b — Transkribus keşfi (ilk tur). **Kısmen tamamlandı, bkz. Step 8
+      için devamı:** `@lazyants/transkribus-mcp-server` ile kimlik doğrulama
+      çalıştı, 300 tool listelendi, ama `transkribus_upload_page`'in şemasız
+      `pageData` parametresi nedeniyle görüntü yükleme adımında durulmuştu.
 - [x] Step 6 — **Hugging Face Spaces deploy'a hazırlık** (Docker, kalıcı
       depolama, Basic Auth). Küçük bir kullanıcı grubu (siz + birkaç kişi)
       için tam işlevsel (salt-okunur değil) bir deploy hedeflendi:
@@ -431,6 +416,57 @@ altyapınıza deploy edip `KRAKEN_DEVICE=cuda:0` ayarlamanız gerekir.
         `htr_backend: "remote"` ile gerçek bir istek (200,
         `chunks_indexed: 1`) — ayrı, izole bir backend örneğiyle,
         kullanıcının canlı oturumuna dokunmadan.
+- [~] Step 8 — Transkribus keşfi (ikinci tur, derinlemesine). Amaç: Step 5b'de
+      tıkanan görüntü yüklemeyi çözüp, hesaptaki gerçek herkese açık Osmanlıca
+      modellerini (htrId 169801 "Ottoman Fatwa Manuscript", 52502
+      "OttomanTurkish_Print_1", ve `app.transkribus.org/models?search=ottoman`
+      üzerinden bulunan 4 model daha: 461445, 457745, 57485, 56496) ingest
+      arayüzünden seçilebilir hale getirmek. **300 tool'lu MCP sarmalayıcısını
+      bırakıp Transkribus'un legacy `TrpServer` REST API'sine doğrudan, ham
+      `httpx` istemcisiyle bağlanıldı** (bkz. sonuçlar için `application.wadl`
+      dosyasını `https://transkribus.eu/TrpServer/rest/application.wadl`'dan
+      indirip inceleme yöntemi — üçüncü parti dokümantasyondan çok daha
+      güvenilir çıktı).
+      - **Çözüldü — görüntü yükleme:** eski zip yöntemi
+        (`POST /collections/{colId}/upload`) gerçekten kaldırılmış (HTTP 404,
+        "no longer available"). Yerine geçen, gerçek hesapta uçtan uca
+        doğrulanmış akış: `POST /uploads?collId=` (JSON body
+        `{"md":{"title":...},"pageList":{"pages":[{"fileName":...,"pageNr":1}]}}`)
+        → döndürdüğü `uploadId` ile `PUT /uploads/{uploadId}` (multipart,
+        alan adı `img`) → `GET /jobs/{jobId}` ile bekleme → gerçek bir `docId`
+        oluşuyor. Gerçek görüntüyle test edildi (`docId 18693058`,
+        koleksiyon `ottoman-rag-test`, coll `2501806`).
+      - **Çözüldü — PyLaia tanıma çağrısı çalışıyor ama tek başına yetersiz:**
+        `POST /pylaia/{collId}/{modelId}/recognition?id={docId}&pages=1` gerçek
+        bir job başlatıp başarıyla bitiyor (htrId 169801 ile, gerçek ücretsiz
+        kredi kullanılarak doğrulandı), ama **segmentasyon (satır tespiti)
+        olmadan hiç metin üretmiyor** — Transkribus'ta tanımadan önce mutlaka
+        bir "Layout Analysis" adımı gerekiyor.
+      - **Engel — legacy Layout Analysis sunucu tarafında bozuk:**
+        `POST /LA/analyze` hem kendi `httpx` istemcimizden hem de bağımsız MCP
+        sarmalayıcısından aynı `HTTP 500` (Java `IllegalArgumentException:
+        argument type mismatch`, Jersey reflection hatası) ile başarısız oldu
+        — istemciden bağımsız, gerçek bir sunucu hatası. Transkribus'un kendi
+        dokümantasyonu da bu API'yi "artık desteklenmiyor" diye işaretliyor.
+      - **Engel — modern "Metagrapho" API de şu an çalışmıyor:** Haziran 2026
+        lansmanlı, tek çağrıda segmentasyon+tanıma yapan yeni
+        `POST https://transkribus.eu/processing/v1/processes` API'si bulundu
+        ve doğru şekilde kimlik doğrulaması yapıldı (`grant_type=password`,
+        `client_id=processing-api-client`, OpenID Connect üzerinden
+        `account.readcoop.eu` — resmi dokümantasyondaki yöntemin birebir
+        aynısı). Ama **her denemede `401 Unauthorized` dönüyor** — bu son
+        olarak Transkribus'un kendi resmi Swagger UI'ından
+        (`transkribus.eu/processing/swagger/`), resmi OAuth2/PKCE "Authorize"
+        akışıyla, varsayılan örnek istekle bile doğrulandı (yani hesaba,
+        token'a veya bizim koda özgü bir sorun değil — API'nin kendisi şu an
+        gerçek isteklere hizmet vermiyor).
+      - **Sonuç / karar:** Transkribus entegrasyonu (upload hariç) şu an
+        Transkribus'un kendi altyapısındaki arızalar yüzünden bloke.
+        Yerel Kraken pipeline'ı tek çalışan HTR kaynağı olarak kalmaya devam
+        ediyor. Yukarıdaki akışlar (özellikle `/uploads` ve
+        `/pylaia/.../recognition`) kod olarak hazır ve test edilmiş
+        durumda — Transkribus tarafı düzelirse (ya da Layout Analysis için
+        alternatif bir yol bulunursa) hızlıca devreye alınabilir.
 
 ## Ortam kurulumu
 

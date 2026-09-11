@@ -1,8 +1,11 @@
 from __future__ import annotations
 
+import asyncio
 import base64
+import os
 import re
 import secrets
+import subprocess
 import sys
 import uuid
 from contextlib import asynccontextmanager
@@ -28,6 +31,7 @@ from .config import (
     CHROMA_DB_DIR,
     EMBEDDING_MODEL_NAME,
     HTR_KRAKEN_DIR,
+    HTR_KRAKEN_PYTHON,
     HTR_MODE,
     KRAKEN_DEFAULT_MODEL,
     KRAKEN_MODEL_DIR,
@@ -35,6 +39,8 @@ from .config import (
     RAW_IMAGES_DIR,
     REMOTE_HTR_API_KEY,
     REMOTE_HTR_URL,
+    SEARCH_HTTP_PORT,
+    SEARCH_HTTP_URL,
     SEARCH_SERVER_DIR,
 )
 from .mcp_clients import McpClientManager
@@ -45,25 +51,58 @@ _ALLOWED_EXTENSIONS = {".jpg", ".jpeg", ".png", ".tif", ".tiff"}
 FRONTEND_DIST_DIR = PROJECT_ROOT / "frontend" / "dist"
 
 mcp_manager = McpClientManager()
+search_http_client: httpx.AsyncClient | None = None
+_search_process: subprocess.Popen | None = None
+
+
+async def _start_search_http_server() -> subprocess.Popen:
+    """search-server'i MCP stdio degil duz HTTP olarak baslatir - bkz.
+    config.py'deki SEARCH_HTTP_PORT yorumu (embed_texts, MCP stdio
+    transport'unda dogrulanamayan bir sebeple kilitleniyordu)."""
+    env = {
+        "CHROMA_DB_DIR": CHROMA_DB_DIR,
+        "EMBEDDING_MODEL_NAME": EMBEDDING_MODEL_NAME,
+        "HF_HUB_OFFLINE": "1",
+        "HF_HUB_DISABLE_PROGRESS_BARS": "1",
+        "TRANSFORMERS_OFFLINE": "1",
+        "ANONYMIZED_TELEMETRY": "False",
+    }
+    full_env = {**os.environ, **env}
+    full_env.pop("SSL_CERT_FILE", None)  # bkz. http_app.py docstring
+    proc = subprocess.Popen(
+        [sys.executable, "-m", "uvicorn", "search_server.http_app:app", "--host", "127.0.0.1", "--port", str(SEARCH_HTTP_PORT)],
+        cwd=str(SEARCH_SERVER_DIR),
+        env=full_env,
+    )
+    # Hazir olana kadar bekle - ilk embedding modeli yuklemesi birkaç
+    # saniye surebilir, ama HTTP sunucusunun kendisi hemen ayaga kalkar.
+    async with httpx.AsyncClient() as probe:
+        for _ in range(60):
+            try:
+                r = await probe.get(f"{SEARCH_HTTP_URL}/health", timeout=2.0)
+                if r.status_code == 200:
+                    break
+            except httpx.HTTPError:
+                pass
+            await asyncio.sleep(1.0)
+        else:
+            raise RuntimeError(f"search-server HTTP {SEARCH_HTTP_URL}/health 60 saniyede ayağa kalkmadı")
+    return proc
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    # "python" yerine sys.executable: alt MCP surecleri backend'in kendi
-    # calistigi yorumlayiciyla acilir. Boylece backend nasil baslatilirsa
-    # baslatilsin (tam yol, conda activate, conda run), PATH'te "python"un
-    # hangi ortama cozuldugune bagli olmadan hep dogru (paketlerin kurulu
-    # oldugu) ortam kullanilir.
-    await mcp_manager.start(
-        "search",
-        command=sys.executable,
-        args=["-m", "search_server.server"],
-        cwd=str(SEARCH_SERVER_DIR),
-        env={"CHROMA_DB_DIR": CHROMA_DB_DIR, "EMBEDDING_MODEL_NAME": EMBEDDING_MODEL_NAME},
-    )
+    global search_http_client, _search_process
+    _search_process = await _start_search_http_server()
+    search_http_client = httpx.AsyncClient(base_url=SEARCH_HTTP_URL, timeout=120.0)
+
+    # HTR_KRAKEN_PYTHON, sys.executable degil: kraken kendi ayri conda
+    # ortaminda kurulu (bkz. config.py'deki HTR_KRAKEN_PYTHON yorumu -
+    # transformers ile safetensors surum catismasi). Bu hala MCP stdio
+    # uzerinden calisiyor - o dogru calisiyor, sorun search-server'daydi.
     await mcp_manager.start(
         "htr-kraken",
-        command=sys.executable,
+        command=HTR_KRAKEN_PYTHON,
         args=["-m", "htr_server.server"],
         cwd=str(HTR_KRAKEN_DIR),
         env={"KRAKEN_MODEL_DIR": KRAKEN_MODEL_DIR, "KRAKEN_DEFAULT_MODEL": KRAKEN_DEFAULT_MODEL},
@@ -72,6 +111,9 @@ async def lifespan(app: FastAPI):
         yield
     finally:
         await mcp_manager.stop_all()
+        await search_http_client.aclose()
+        if _search_process is not None:
+            _search_process.terminate()
 
 
 class BasicAuthMiddleware(BaseHTTPMiddleware):
@@ -128,7 +170,7 @@ class AskRequest(BaseModel):
 @app.post("/ask", response_model=AskResponse)
 async def ask(req: AskRequest) -> AskResponse:
     return await answer_question(
-        mcp_manager, req.question, req.manuscript_id, req.top_k, req.language
+        search_http_client, req.question, req.manuscript_id, req.top_k, req.language
     )
 
 
@@ -258,11 +300,11 @@ async def ingest(req: IngestRequest) -> IngestResponse:
 
     chunks = chunk_page(htr_result, req.manuscript, req.page, max_chars=req.max_chars)
 
-    search_client = mcp_manager.get("search")
-    indexed = await search_client.call_tool(
-        "index_chunks", {"chunks": [c.model_dump(mode="json") for c in chunks]}
+    resp = await search_http_client.post(
+        "/index_chunks", json={"chunks": [c.model_dump(mode="json") for c in chunks]}
     )
-    return IngestResponse(chunks_indexed=indexed)
+    resp.raise_for_status()
+    return IngestResponse(chunks_indexed=resp.json()["indexed"])
 
 
 # Statik frontend build'i (varsa) en sonda mount edilir - butun API

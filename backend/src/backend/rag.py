@@ -6,13 +6,13 @@ dondurur.
 
 from __future__ import annotations
 
+import httpx
 from anthropic import Anthropic
 from ottoman_rag_common.geometry import BoundingBox
 from pydantic import BaseModel
 
 from . import store
 from .config import ANTHROPIC_API_KEY, ANTHROPIC_MODEL
-from .mcp_clients import McpClientManager
 
 _anthropic_client: Anthropic | None = None
 
@@ -104,10 +104,18 @@ def _build_prompt(question: str, passages: list[dict], language: str) -> str:
         lines = [
             "You are an assistant helping with research on Ottoman manuscripts.",
             "The following passages were transcribed via HTR (handwritten text "
-            "recognition) from source documents; they may contain garbled "
-            "characters from recognition errors. Answer ONLY in English, based "
-            "solely on these passages; if they are not sufficient to answer the "
-            "question, say so clearly rather than guessing.",
+            "recognition) from source documents; HTR on historical Ottoman script "
+            "is inherently noisy (misplaced dots/diacritics, dropped letters), so "
+            "expect partial legibility rather than a clean transcription. Answer "
+            "ONLY in English, based solely on these passages. Give your best-effort "
+            "reading even when the text is only partially legible: identify "
+            "recognizable words/phrases and what they suggest about the document's "
+            "subject, and explicitly flag which parts are uncertain or illegible "
+            "(e.g. \"appears to concern X, though Y is unclear due to HTR noise\"). "
+            "Never invent specific facts, names, dates, or numbers that are not "
+            "actually present in the passages -- only refuse to answer if the "
+            "passages are truly illegible or genuinely unrelated to the question, "
+            "not merely imperfect.",
             "",
             "Passages:",
         ]
@@ -120,9 +128,17 @@ def _build_prompt(question: str, passages: list[dict], language: str) -> str:
     lines = [
         "Sen Osmanlıca el yazması araştırmalarına yardımcı olan bir asistansın.",
         "Aşağıdaki pasajlar HTR (el yazması tanıma) ile transkribe edilmiş kaynak "
-        "metinlerdir; tanıma hatalarından kaynaklanan bozuk karakterler içerebilir. "
-        "SADECE bu pasajlara dayanarak Türkçe cevap ver; pasajlar soruyu "
-        "yanıtlamaya yetmiyorsa bunu açıkça belirt, tahminde bulunma.",
+        "metinlerdir; tarihi Osmanlıca metinlerde HTR doğası gereği gürültülüdür "
+        "(yanlış yerleşmiş nokta/harekeler, düşen harfler) - tam temiz bir "
+        "transkripsiyon değil, kısmi okunabilirlik bekle. SADECE bu pasajlara "
+        "dayanarak Türkçe cevap ver. Metin kısmen okunabilir olsa bile elinden "
+        "gelen en iyi okumayı yap: tanıyabildiğin kelime/ifadeleri ve bunların "
+        "belgenin konusu hakkında neyi düşündürdüğünü belirt, hangi kısımların "
+        "belirsiz/okunaksız olduğunu açıkça işaretle (ör. \"X hakkında görünüyor, "
+        "ancak Y kısmı HTR gürültüsü nedeniyle net değil\"). Pasajlarda gerçekten "
+        "yer almayan belirli olgular, isimler, tarihler veya sayılar UYDURMA - "
+        "sadece pasajlar gerçekten okunaksız veya soruyla tamamen alakasızsa "
+        "cevap vermeyi reddet, sırf kusurlu diye değil.",
         "",
         "Pasajlar:",
     ]
@@ -134,17 +150,17 @@ def _build_prompt(question: str, passages: list[dict], language: str) -> str:
 
 
 async def answer_question(
-    mcp_manager: McpClientManager,
+    search_http_client: httpx.AsyncClient,
     question: str,
     manuscript_id: str | None = None,
     top_k: int = 5,
     language: str = "tr",
 ) -> AskResponse:
-    search_client = mcp_manager.get("search")
-    passages: list[dict] = await search_client.call_tool(
-        "search",
-        {"query": question, "top_k": top_k, "manuscript_id": manuscript_id},
+    resp = await search_http_client.post(
+        "/search", json={"query": question, "top_k": top_k, "manuscript_id": manuscript_id}
     )
+    resp.raise_for_status()
+    passages: list[dict] = resp.json()
 
     if not passages:
         no_source_msg = (

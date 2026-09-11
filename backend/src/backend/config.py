@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import os
+import sys
 from pathlib import Path
 
 from dotenv import load_dotenv
@@ -20,6 +21,16 @@ METADATA_DB_PATH = Path(
 
 SEARCH_SERVER_DIR = PROJECT_ROOT / "mcp-servers" / "search-server" / "src"
 HTR_KRAKEN_DIR = PROJECT_ROOT / "mcp-servers" / "htr-server" / "src"
+
+# search-server, MCP stdio degil duz HTTP uzerinden calisiyor (2026-09) -
+# bkz. mcp-servers/search-server/src/search_server/http_app.py'nin
+# docstring'i: embed_texts, MCP'nin stdio alt-surec transport'unda
+# (backend'den bagimsiz, izole testlerde bile) sessizce kilitleniyordu,
+# kok nedeni tam dogrulanamadi. htr-kraken hala MCP uzerinden calisiyor
+# (o calisiyor, sorun degil) - ileride kullanicinin kendi HTR modeli
+# entegre edilirken ayni MCP deseni kullanilacak.
+SEARCH_HTTP_PORT = int(os.environ.get("SEARCH_HTTP_PORT", "8100"))
+SEARCH_HTTP_URL = f"http://127.0.0.1:{SEARCH_HTTP_PORT}"
 
 
 def _resolve_path(env_value: str, default: Path) -> str:
@@ -42,6 +53,18 @@ KRAKEN_MODEL_DIR = _resolve_path(
     os.environ.get("KRAKEN_MODEL_DIR", ""), PROJECT_ROOT / "mcp-servers" / "htr-server" / "models"
 )
 KRAKEN_DEFAULT_MODEL = os.environ.get("KRAKEN_DEFAULT_MODEL", "")
+
+# htr-kraken alt sureci ARTIK sys.executable ile degil, kendi ayri conda
+# ortamiyla baslatiliyor (2026-09): kraken==7.1.1 safetensors~=0.7.0 ister,
+# search-server'in kullandigi transformers==5.16.1 ise safetensors>=0.8.0 -
+# ikisi ayni ortamda cozumlenemez (gercek ResolutionImpossible, versiyon
+# gevsetmekle duzelmiyor). "ottoman-rag-kraken" adinda ayri bir conda ortami
+# olusturup sadece ottoman_rag_common + htr-server (dolayisiyla kraken)
+# oraya kuruldu; backend kendi ortaminda (transformers ile) kalmaya devam
+# ediyor. Bu env degiskeni bos/eksikse sys.executable'a geri doner (ör.
+# Docker/HF Spaces gibi tek-ortamli dagitimlarda, kraken orada ayri
+# kurulmuyorsa).
+HTR_KRAKEN_PYTHON = os.environ.get("HTR_KRAKEN_PYTHON") or sys.executable
 
 # HTR calisma yeri: "local" (bu makinede CPU, MCP alt sureci - varsayilan)
 # ya da "remote" (GPU'lu uzak bir sunucu, ör. Google Cloud Run + GPU veya

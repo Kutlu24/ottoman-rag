@@ -5,6 +5,8 @@ description = "Embedding + vektor arama MCP sunucusu (provenance-aware chunk ret
 requires-python = ">=3.10"
 dependencies = [
     "mcp[cli]>=1.2.0,<2.0.0",
+    "fastapi>=0.110",
+    "uvicorn[standard]>=0.29",
     "chromadb>=0.5.0",
     # Bu ikili bu makinede dogrulanmis sekilde calisiyor; guncel PyPI
     # surumleri arasinda transformers'in PreTrainedModel'i tasidigi/kaldirdigi

@@ -12,7 +12,7 @@ const emptyState = {
   krakenModel: "",
 };
 
-export function IngestForm() {
+export function IngestForm({ onIngested }: { onIngested?: (manuscriptId: string) => void }) {
   const { t } = useLanguage();
   const [form, setForm] = useState(emptyState);
   const [file, setFile] = useState<File | null>(null);
@@ -62,6 +62,7 @@ export function IngestForm() {
       const ingestResult = await ingestPage(manuscript, page, form.krakenModel || undefined, htrBackend);
 
       setResult(t.ingestSuccess(ingestResult.chunks_indexed, manuscript.manuscript_id));
+      onIngested?.(manuscript.manuscript_id);
       setForm(emptyState);
       setFile(null);
     } catch (err) {
