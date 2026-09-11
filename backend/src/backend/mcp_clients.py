@@ -109,6 +109,9 @@ class McpClientManager:
             raise RuntimeError(f"MCP client başlatılmamış: {name}")
         return self._clients[name]
 
+    def is_started(self, name: str) -> bool:
+        return name in self._clients
+
     async def stop_all(self) -> None:
         for client in self._clients.values():
             await client.stop()

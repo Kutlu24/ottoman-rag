@@ -53,6 +53,7 @@ FRONTEND_DIST_DIR = PROJECT_ROOT / "frontend" / "dist"
 mcp_manager = McpClientManager()
 search_http_client: httpx.AsyncClient | None = None
 _search_process: subprocess.Popen | None = None
+_htr_kraken_lock = asyncio.Lock()
 
 
 async def _start_search_http_server() -> subprocess.Popen:
@@ -90,23 +91,39 @@ async def _start_search_http_server() -> subprocess.Popen:
     return proc
 
 
+async def _ensure_htr_kraken_started() -> None:
+    """htr-kraken'i lifespan'da degil, ilk yerel HTR ihtiyacinda baslatir.
+
+    Render'in 512MB ucretsiz tier'inda, search-server (embedding, kendi
+    PyTorch yigini) ve htr-kraken (kraken, AYRI bir PyTorch yigini) ikisi de
+    lifespan'da acilista baslatilinca container OOM'a giriyordu - iki tam
+    torch surumu ayni container'da ayni anda RAM'de. /ask (arama+LLM) hicbir
+    zaman kraken'e ihtiyac duymuyor; sadece /ingest'in yerel-HTR yolu
+    duyuyor. Bu yuzden kraken artik SADECE ilk yerel /ingest cagrisinda,
+    talep uzerine baslatiliyor - boylece saf soru-cevap trafiginde container
+    tek bir torch yigini (search-server) tasiyor.
+    """
+    async with _htr_kraken_lock:
+        if mcp_manager.is_started("htr-kraken"):
+            return
+        await mcp_manager.start(
+            "htr-kraken",
+            command=HTR_KRAKEN_PYTHON,
+            args=["-m", "htr_server.server"],
+            cwd=str(HTR_KRAKEN_DIR),
+            env={"KRAKEN_MODEL_DIR": KRAKEN_MODEL_DIR, "KRAKEN_DEFAULT_MODEL": KRAKEN_DEFAULT_MODEL},
+        )
+
+
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     global search_http_client, _search_process
     _search_process = await _start_search_http_server()
     search_http_client = httpx.AsyncClient(base_url=SEARCH_HTTP_URL, timeout=120.0)
 
-    # HTR_KRAKEN_PYTHON, sys.executable degil: kraken kendi ayri conda
-    # ortaminda kurulu (bkz. config.py'deki HTR_KRAKEN_PYTHON yorumu -
-    # transformers ile safetensors surum catismasi). Bu hala MCP stdio
-    # uzerinden calisiyor - o dogru calisiyor, sorun search-server'daydi.
-    await mcp_manager.start(
-        "htr-kraken",
-        command=HTR_KRAKEN_PYTHON,
-        args=["-m", "htr_server.server"],
-        cwd=str(HTR_KRAKEN_DIR),
-        env={"KRAKEN_MODEL_DIR": KRAKEN_MODEL_DIR, "KRAKEN_DEFAULT_MODEL": KRAKEN_DEFAULT_MODEL},
-    )
+    # htr-kraken ARTIK burada eagerly baslatilmiyor - bkz.
+    # _ensure_htr_kraken_started docstring'i. /ingest'in yerel-HTR yolu onu
+    # ilk kullanimda kendisi baslatir.
     try:
         yield
     finally:
@@ -290,6 +307,7 @@ async def ingest(req: IngestRequest) -> IngestResponse:
     if backend_choice == "remote":
         htr_result = await _run_htr_remote(req.page.image_path, req.kraken_model)
     else:
+        await _ensure_htr_kraken_started()
         htr_client = mcp_manager.get("htr-kraken")
         raw_result = await htr_client.call_tool(
             "run_htr",
