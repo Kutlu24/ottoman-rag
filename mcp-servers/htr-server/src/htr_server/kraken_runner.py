@@ -43,19 +43,33 @@ def _resolve_kraken_executable() -> str:
     return "kraken"  # son care: PATH aramasi
 
 
-def run_kraken(image_path: str, model_path: str, device: str = "cpu") -> HtrPageResult:
+def run_kraken(
+    image_path: str, model_path: str | None, device: str = "cpu", segment_only: bool = False
+) -> HtrPageResult:
     """device: kraken'in -d/--device bayragi - "cpu" (varsayilan, her yerde
     calisir), veya gercek bir GPU'su olan bir makinede/uzak sunucuda
     "cuda:0" gibi bir deger. Uzak GPU altyapisi (Google Cloud, universite
     sunucusu vb.) kullanan kurulumlarda bu deger "cuda:0" verilir - bkz.
-    mcp-servers/remote-htr-server."""
-    image = Path(image_path)
-    model = Path(model_path)
+    mcp-servers/remote-htr-server.
 
+    segment_only=True: kraken'in "ocr -m model" adimini atlar, sadece
+    "segment -bl" calistirir - donen HtrPageResult'ta her satirin polygon/
+    bbox'i var ama text bos. Kutlu24'un kendi CRNN modeli (bkz.
+    crnn_model.py) sadece tanima yapabildigi, sayfa segmentasyonu
+    yapamadigi icin hibrit akis (server.py'deki run_htr) bunu boyle
+    kullanir: segmentasyonu kraken yapar, tanimayi CRNN modeli yapar.
+    model_path bu modda kullanilmaz, None olabilir."""
+    image = Path(image_path)
     if not image.exists():
         raise KrakenError(f"Görüntü bulunamadı: {image}")
-    if not model.exists():
-        raise KrakenError(f"Model bulunamadı: {model}")
+
+    model: Path | None = None
+    if not segment_only:
+        if not model_path:
+            raise KrakenError("segment_only=False iken model_path zorunlu")
+        model = Path(model_path)
+        if not model.exists():
+            raise KrakenError(f"Model bulunamadı: {model}")
 
     with tempfile.TemporaryDirectory() as tmpdir:
         output_xml = Path(tmpdir) / f"{image.stem}.xml"
@@ -67,12 +81,15 @@ def run_kraken(image_path: str, model_path: str, device: str = "cpu") -> HtrPage
             "-i", str(image), str(output_xml),
             "-x",
             "segment", "-bl",
-            "ocr", "-m", str(model),
-            # PyTorch/kraken'in kendi ic worker havuzlarini (num_workers vb.)
-            # tek surece indirir; asil deadlock nedeni asagidaki stdin
-            # duzeltmesiydi ama bu da ekstra guvenlik.
-            "--num-line-workers", "0",
         ]
+        if not segment_only:
+            cmd += [
+                "ocr", "-m", str(model),
+                # PyTorch/kraken'in kendi ic worker havuzlarini (num_workers vb.)
+                # tek surece indirir; asil deadlock nedeni asagidaki stdin
+                # duzeltmesiydi ama bu da ekstra guvenlik.
+                "--num-line-workers", "0",
+            ]
         # KRITIK: stdin'i acikca DEVNULL'a baglamak gerekiyor. htr-kraken MCP
         # sunucusu (bu kodun calistigi surec) kendi stdin'ini backend'e
         # baglayan bir pipe (MCP stdio protokolu) uzerinden okuyor; stdin
@@ -113,7 +130,7 @@ def run_kraken(image_path: str, model_path: str, device: str = "cpu") -> HtrPage
         htr_run = HtrRun(
             htr_run_id=str(uuid.uuid4()),
             backend="kraken",
-            model_name=model.stem,
-            model_ref=f"{model.name} (device={device})",
+            model_name=model.stem if model is not None else "kraken-default-segmenter",
+            model_ref=f"{model.name} (device={device})" if model is not None else f"segment-only (device={device})",
         )
         return parse_page_xml(str(output_xml), str(image), htr_run)

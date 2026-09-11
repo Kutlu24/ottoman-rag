@@ -1,5 +1,5 @@
 import { useState, type FormEvent } from "react";
-import { createManuscript, createPage, ingestPage, uploadImage, type HtrBackend } from "../api";
+import { createManuscript, createPage, ingestPage, uploadImage, type HtrBackend, type HtrEngine } from "../api";
 import { useLanguage } from "../i18n/LanguageContext";
 
 const emptyState = {
@@ -17,6 +17,7 @@ export function IngestForm({ onIngested }: { onIngested?: (manuscriptId: string)
   const [form, setForm] = useState(emptyState);
   const [file, setFile] = useState<File | null>(null);
   const [htrBackend, setHtrBackend] = useState<HtrBackend>("local");
+  const [htrEngine, setHtrEngine] = useState<HtrEngine>("kraken");
   const [busy, setBusy] = useState(false);
   const [step, setStep] = useState("");
   const [result, setResult] = useState<string | null>(null);
@@ -59,7 +60,7 @@ export function IngestForm({ onIngested }: { onIngested?: (manuscriptId: string)
       await createPage(page);
 
       setStep(t.ingestStepRun);
-      const ingestResult = await ingestPage(manuscript, page, form.krakenModel || undefined, htrBackend);
+      const ingestResult = await ingestPage(manuscript, page, form.krakenModel || undefined, htrBackend, htrEngine);
 
       setResult(t.ingestSuccess(ingestResult.chunks_indexed, manuscript.manuscript_id));
       onIngested?.(manuscript.manuscript_id);
@@ -142,6 +143,16 @@ export function IngestForm({ onIngested }: { onIngested?: (manuscriptId: string)
           <option value="remote">{t.ingestBackendRemote}</option>
         </select>
       </label>
+
+      {htrBackend === "local" && (
+        <label>
+          {t.ingestEngineLabel}
+          <select value={htrEngine} onChange={(e) => setHtrEngine(e.target.value as HtrEngine)}>
+            <option value="kraken">{t.ingestEngineKraken}</option>
+            <option value="crnn_v2">{t.ingestEngineCrnn}</option>
+          </select>
+        </label>
+      )}
 
       <button type="submit" disabled={busy}>
         {busy ? step || t.ingestSubmitBusy : t.ingestSubmit}

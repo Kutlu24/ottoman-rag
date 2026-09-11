@@ -278,6 +278,10 @@ class IngestRequest(BaseModel):
     # birakilirsa sunucunun HTR_MODE ortam degiskeni (varsayilan "local")
     # kullanilir - boylece arastirmaci her yukleme icin secebilir.
     htr_backend: str | None = None
+    # "kraken" (varsayilan) | "crnn_v2" (Kutlu24'un kendi egittigi model,
+    # deneysel - bkz. htr-server/server.py'deki run_htr docstring'i).
+    # Sadece htr_backend="local" iken anlamli.
+    htr_engine: str = "kraken"
 
 
 class IngestResponse(BaseModel):
@@ -335,7 +339,11 @@ async def ingest(req: IngestRequest) -> IngestResponse:
             htr_client = mcp_manager.get("htr-kraken")
             raw_result = await htr_client.call_tool(
                 "run_htr",
-                {"image_path": req.page.image_path, "model_name": req.kraken_model},
+                {
+                    "image_path": req.page.image_path,
+                    "model_name": req.kraken_model,
+                    "htr_engine": req.htr_engine,
+                },
                 timeout=600,  # Kraken CPU'da yavas olabilir; sunucuyu sonsuza kadar kilitlemesin
             )
             htr_result = HtrPageResult.model_validate(raw_result)

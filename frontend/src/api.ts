@@ -127,12 +127,14 @@ export interface IngestResponse {
 }
 
 export type HtrBackend = "local" | "remote";
+export type HtrEngine = "kraken" | "crnn_v2";
 
 export async function ingestPage(
   manuscript: ManuscriptRef,
   page: PageRef,
   krakenModel?: string,
   htrBackend?: HtrBackend,
+  htrEngine?: HtrEngine,
 ): Promise<IngestResponse> {
   const res = await fetch(`${API_BASE}/ingest`, {
     method: "POST",
@@ -142,6 +144,7 @@ export async function ingestPage(
       page,
       kraken_model: krakenModel || null,
       htr_backend: htrBackend || null,
+      htr_engine: htrEngine || "kraken",
     }),
   });
   return handle<IngestResponse>(res);
