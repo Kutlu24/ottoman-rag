@@ -467,6 +467,21 @@ altyapınıza deploy edip `KRAKEN_DEVICE=cuda:0` ayarlamanız gerekir.
         `/pylaia/.../recognition`) kod olarak hazır ve test edilmiş
         durumda — Transkribus tarafı düzelirse (ya da Layout Analysis için
         alternatif bir yol bulunursa) hızlıca devreye alınabilir.
+      - **2026-09-11 tekrar kontrol:** Hesap şifresi değişmişti, legacy
+        `POST /auth/login` bu yüzden `403 Forbidden` ("Invalid username or
+        password... switch to Single Sign-On") veriyordu — Transkribus'un
+        kimlik doğrulamasını READ-COOP SSO'ya (`account.readcoop.eu`)
+        taşıdığının bir işareti. Kullanıcı `account.readcoop.eu` üzerinden
+        tarayıcıda giriş yapıp güncel şifreyi verdi, `.env`
+        güncellendi — **legacy `/auth/login` artık 200 dönüyor**, oturum
+        açılabiliyor (`collections/list`, `collections/{id}/list` de 200).
+        Ama asıl iki engel **aynen duruyor, değişmemiş**:
+        `POST /LA/analyze` hâlâ `HTTP 500`; Metagrapho OAuth2 token alma
+        (`account.readcoop.eu/.../token`) hâlâ 200 dönüp gerçek token
+        veriyor ama `POST /processing/v1/processes` hâlâ `401
+        Unauthorized`. Yani sorun kimlik bilgilerinde değildi (login
+        düzeldi), Transkribus'un kendi Layout Analysis/Metagrapho
+        altyapısında — karar değişmedi, Kraken tek çalışan kaynak.
 
 ## Ortam kurulumu
 
