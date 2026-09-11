@@ -97,11 +97,15 @@ async def _ensure_htr_kraken_started() -> None:
     Render'in 512MB ucretsiz tier'inda, search-server (embedding, kendi
     PyTorch yigini) ve htr-kraken (kraken, AYRI bir PyTorch yigini) ikisi de
     lifespan'da acilista baslatilinca container OOM'a giriyordu - iki tam
-    torch surumu ayni container'da ayni anda RAM'de. /ask (arama+LLM) hicbir
-    zaman kraken'e ihtiyac duymuyor; sadece /ingest'in yerel-HTR yolu
-    duyuyor. Bu yuzden kraken artik SADECE ilk yerel /ingest cagrisinda,
-    talep uzerine baslatiliyor - boylece saf soru-cevap trafiginde container
-    tek bir torch yigini (search-server) tasiyor.
+    torch surumu ayni container'da ayni anda RAM'de. Bu tek basina yetmedi:
+    /ingest'in yerel-HTR yolu kraken'i baslattiginda, search-server HALA
+    calisiyor oluyor ve ayni OOM iki sürecin yan yana durmasindan kaynaklanan
+    ayni sorunu /ingest sirasinda yeniden yaratiyordu. Cozum: /ingest'in
+    yerel-HTR yolu artik search-server'i GECICI olarak durdurup kraken'i
+    baslatiyor, HTR bitince kraken'i kapatip search-server'i (embedding icin
+    gerekli) geri baslatiyor - bkz. ingest() icindeki durdur/baslat sirasi.
+    Bu fonksiyon sadece kraken'i baslatir; search-server'in durdurulmasi
+    cagiran tarafin sorumlulugundadir.
     """
     async with _htr_kraken_lock:
         if mcp_manager.is_started("htr-kraken"):
@@ -113,6 +117,19 @@ async def _ensure_htr_kraken_started() -> None:
             cwd=str(HTR_KRAKEN_DIR),
             env={"KRAKEN_MODEL_DIR": KRAKEN_MODEL_DIR, "KRAKEN_DEFAULT_MODEL": KRAKEN_DEFAULT_MODEL},
         )
+
+
+async def _stop_search_http_server() -> None:
+    """search-server alt surecini gecici olarak kapatir (RAM'i kraken'e
+    birakmak icin) - bkz. _ensure_htr_kraken_started docstring'i.
+    search_http_client nesnesi (httpx.AsyncClient) kapatilmiyor; sadece
+    arkasindaki surec durup _start_search_http_server ile ayni portta
+    yeniden baslatiliyor, boylece client tekrar olusturmaya gerek yok."""
+    global _search_process
+    if _search_process is not None:
+        _search_process.terminate()
+        await asyncio.to_thread(_search_process.wait)
+        _search_process = None
 
 
 @asynccontextmanager
@@ -300,6 +317,7 @@ async def ingest(req: IngestRequest) -> IngestResponse:
     (bkz. kök README - OpenITI Ottoman base modeli). Transkribus üzerinden
     ingestion henüz bu uç noktaya bağlanmadı.
     """
+    global _search_process
     store.upsert_manuscript(req.manuscript)
     store.upsert_page(req.page)
 
@@ -307,14 +325,23 @@ async def ingest(req: IngestRequest) -> IngestResponse:
     if backend_choice == "remote":
         htr_result = await _run_htr_remote(req.page.image_path, req.kraken_model)
     else:
-        await _ensure_htr_kraken_started()
-        htr_client = mcp_manager.get("htr-kraken")
-        raw_result = await htr_client.call_tool(
-            "run_htr",
-            {"image_path": req.page.image_path, "model_name": req.kraken_model},
-            timeout=600,  # Kraken CPU'da yavas olabilir; sunucuyu sonsuza kadar kilitlemesin
-        )
-        htr_result = HtrPageResult.model_validate(raw_result)
+        # search-server ve kraken'in PyTorch yiginlari Render'in 512MB
+        # tier'inda AYNI ANDA sigmiyor (bkz. _ensure_htr_kraken_started
+        # docstring'i) - search-server'i gecici kapatip kraken'e yer aciyoruz,
+        # HTR bitince embedding/indexleme icin geri baslatiyoruz.
+        await _stop_search_http_server()
+        try:
+            await _ensure_htr_kraken_started()
+            htr_client = mcp_manager.get("htr-kraken")
+            raw_result = await htr_client.call_tool(
+                "run_htr",
+                {"image_path": req.page.image_path, "model_name": req.kraken_model},
+                timeout=600,  # Kraken CPU'da yavas olabilir; sunucuyu sonsuza kadar kilitlemesin
+            )
+            htr_result = HtrPageResult.model_validate(raw_result)
+        finally:
+            await mcp_manager.stop("htr-kraken")
+            _search_process = await _start_search_http_server()
 
     chunks = chunk_page(htr_result, req.manuscript, req.page, max_chars=req.max_chars)
 

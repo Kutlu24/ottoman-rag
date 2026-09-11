@@ -112,6 +112,11 @@ class McpClientManager:
     def is_started(self, name: str) -> bool:
         return name in self._clients
 
+    async def stop(self, name: str) -> None:
+        client = self._clients.pop(name, None)
+        if client is not None:
+            await client.stop()
+
     async def stop_all(self) -> None:
         for client in self._clients.values():
             await client.stop()
