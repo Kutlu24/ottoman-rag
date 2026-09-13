@@ -37,7 +37,8 @@ RUN pip install --no-cache-dir \
 
 # Kraken modeli - build sirasinda indirilir (repoda .gitignore'da).
 RUN mkdir -p models && \
-    curl -fL -o models/ottoman_best.mlmodel \
+    curl -fL --retry 5 --retry-all-errors --retry-delay 5 \
+      -o models/ottoman_best.mlmodel \
       "https://zenodo.org/records/7050342/files/ottoman_best.mlmodel?download=1"
 
 ENV KRAKEN_MODEL_DIR=/app/models \

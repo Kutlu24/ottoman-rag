@@ -70,7 +70,8 @@ RUN pip install --no-cache-dir --user \
 # Kraken Ottoman base modeli (OpenITI, Zenodo) - .gitignore'da oldugu icin
 # repodan degil, build sirasinda dogrudan indirilir.
 RUN mkdir -p mcp-servers/htr-server/models && \
-    curl -fL -o mcp-servers/htr-server/models/ottoman_best.mlmodel \
+    curl -fL --retry 5 --retry-all-errors --retry-delay 5 \
+      -o mcp-servers/htr-server/models/ottoman_best.mlmodel \
       "https://zenodo.org/records/7050342/files/ottoman_best.mlmodel?download=1"
 
 # Embedding modelini (~1GB) runtime'da degil build'de indirip HF Hub
