@@ -87,9 +87,10 @@ ENV KRAKEN_MODEL_DIR=$HOME/app/mcp-servers/htr-server/models \
 
 EXPOSE 7860
 
-# Shell form (JSON-array degil) kasitli: $PORT genisletmesi icin bir kabuk
-# gerekiyor. HF Spaces sabit 7860 (app_port) bekler ve PORT ayarlamaz -
-# ${PORT:-7860} bu durumda 7860'a duser. Render (ve benzeri platformlar)
-# PORT'u dinamik olarak enjekte eder - ayni Dockerfile ikisinde de degisiklik
-# gerektirmeden calisir.
-CMD python -m uvicorn backend.main:app --host 0.0.0.0 --port ${PORT:-7860} --app-dir backend/src
+# Root only to let the entrypoint chown a freshly-mounted volume before it
+# execs the real server as "user" - never runs application code as root.
+USER root
+COPY docker-entrypoint.sh /docker-entrypoint.sh
+RUN chmod +x /docker-entrypoint.sh
+
+ENTRYPOINT ["/docker-entrypoint.sh"]
