@@ -10,10 +10,16 @@ from dotenv import load_dotenv
 PROJECT_ROOT = Path(__file__).resolve().parents[3]
 load_dotenv(PROJECT_ROOT / ".env")
 
-ANTHROPIC_API_KEY = os.environ.get("ANTHROPIC_API_KEY", "")
-# Haiku 4.5: en ucuz mevcut Claude modeli ($1/$5 per MTok) - bu projenin
-# kisa, retrieval ile sinirli prompt'lari icin maliyet/kalite dengesi iyi.
-ANTHROPIC_MODEL = os.environ.get("ANTHROPIC_MODEL", "claude-haiku-4-5-20251001")
+# Cevap uretimi artik yerel Qwen2.5 7B (Ollama) uzerinden - Claude'un
+# zorunlu tool-use'u (yapilandirilmis JSON: answer + citations) gercek
+# testte 7B modelde tutarsizdi (3 denemeden sadece 1'i dogru semayi
+# tutturdu), 14B'de ise DAHA KOTUYDU (3/3 yanlis alan adlari uydurdu, ustune
+# 33-105 saniye gecikme) - bkz. rag.py'nin _build_prompt'u: model artik
+# yapilandirilmis JSON yerine duz metin + [1] [2] tarzi atif isaretleri
+# uretiyor, bu format kucuk modellerde olcumle cok daha guvenilir cikti
+# (3/3 dogru, 5-6 saniye).
+OLLAMA_BASE_URL = os.environ.get("OLLAMA_BASE_URL", "http://ollama:11434")
+OLLAMA_MODEL = os.environ.get("OLLAMA_MODEL", "qwen2.5:7b-instruct")
 
 METADATA_DB_PATH = Path(
     os.environ.get("METADATA_DB_PATH", str(PROJECT_ROOT / "data" / "metadata.db"))
@@ -83,8 +89,7 @@ RAW_IMAGES_DIR = Path(
 )
 
 # Bos birakilirsa (yerel gelistirmede oldugu gibi) Basic Auth devre disi
-# kalir; production'da (HF Spaces secrets) mutlaka doldurulmali - aksi
-# halde ANTHROPIC_API_KEY gercek para harcayan, herkese acik bir uc nokta
-# arkasinda korumasiz kalir.
+# kalir; production'da doldurulmasi onerilir - herkese acik, korumasiz
+# birakmak istenmeyen bir kullanim/kaynak tuketimi kapisi acar.
 BASIC_AUTH_USER = os.environ.get("BASIC_AUTH_USER", "")
 BASIC_AUTH_PASSWORD = os.environ.get("BASIC_AUTH_PASSWORD", "")

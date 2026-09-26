@@ -154,9 +154,10 @@ class BasicAuthMiddleware(BaseHTTPMiddleware):
     """HTTP Basic Auth ile tum uygulamayi (API + statik frontend) korur.
 
     BASIC_AUTH_USER bos ise (varsayilan, yerel gelistirme) auth tamamen
-    devre disi kalir. Production'da (HF Spaces secrets) doldurulmasi
-    zorunlu - ANTHROPIC_API_KEY gercek para harcadigindan herkese acik,
-    korumasiz birakilmamali.
+    devre disi kalir. Production'da doldurulmasi onerilir - cevap uretimi
+    artik yerel Qwen modeline (bkz. config.OLLAMA_BASE_URL) gittigi icin
+    para maliyeti yok, ama yine de herkese acik, korumasiz birakmak
+    istenmeyen bir kullanim/kaynak tuketimi kapisi acar.
     """
 
     async def dispatch(self, request: Request, call_next):
