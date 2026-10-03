@@ -141,6 +141,10 @@ mitigation below) and the free instance **sleeps after 15 minutes of inactivity*
    Render auto-detects `render.yaml` at the repo root and the `Dockerfile` it points to.
 3. In the Render dashboard, fill in the secrets it prompts for (marked `sync: false`
    in `render.yaml`): `ANTHROPIC_API_KEY`, `BASIC_AUTH_USER`, `BASIC_AUTH_PASSWORD`.
+   Both auth vars matter: since 2026-10 the app fails **closed** on Render — if
+   `BASIC_AUTH_USER`/`BASIC_AUTH_PASSWORD` are unset (or only one of them is), every
+   request returns `503` instead of serving the app without auth. Local development
+   (no `RENDER` env var) keeps the previous behaviour: unset means auth is off.
 4. `render.yaml` already sets `EMBEDDING_MODEL_NAME=intfloat/multilingual-e5-small`
    (smaller than the default `-base` model) specifically to reduce memory pressure
    on the free 512MB tier — switch it back to `-base` if you move to a plan with

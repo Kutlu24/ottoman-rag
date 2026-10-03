@@ -15,3 +15,6 @@ data
 .env.local
 .DS_Store
 training
+**/.env
+**/.env.*
+.env.*

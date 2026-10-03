@@ -153,16 +153,25 @@ async def lifespan(app: FastAPI):
 class BasicAuthMiddleware(BaseHTTPMiddleware):
     """HTTP Basic Auth ile tum uygulamayi (API + statik frontend) korur.
 
-    BASIC_AUTH_USER bos ise (varsayilan, yerel gelistirme) auth tamamen
-    devre disi kalir. Production'da doldurulmasi onerilir - cevap uretimi
-    artik yerel Qwen modeline (bkz. config.OLLAMA_BASE_URL) gittigi icin
-    para maliyeti yok, ama yine de herkese acik, korumasiz birakmak
-    istenmeyen bir kullanim/kaynak tuketimi kapisi acar.
+    BASIC_AUTH_USER ve BASIC_AUTH_PASSWORD birlikte bos ise (varsayilan,
+    yerel gelistirme) auth tamamen devre disi kalir. Production'da
+    (RENDER set edilmisken) bu iki env var unutulduysa uygulama acik
+    servis etmek yerine 503 ile reddedilir (fail closed) -bkz. README'deki
+    env var tablosu: Render dashboard'unda ikisinin de dolu olmasi gerekir.
+    Cevap uretimi artik yerel Qwen modeline (bkz. config.OLLAMA_BASE_URL)
+    gittigi icin para maliyeti yok, ama yine de herkese acik, korumasiz
+    birakmak istenmeyen bir kullanim/kaynak tuketimi kapisi acar.
     """
 
     async def dispatch(self, request: Request, call_next):
-        if not BASIC_AUTH_USER:
+        if not BASIC_AUTH_USER and not BASIC_AUTH_PASSWORD:
+            if os.environ.get("RENDER"):
+                return Response(status_code=503, content="Auth is not configured on this deployment.")
             return await call_next(request)
+        if not BASIC_AUTH_USER or not BASIC_AUTH_PASSWORD:
+            # Yarim yapilandirilmis: bos sifreyle gecilemeyecegi gibi
+            # acikta da kalmasin - her ortamda reddet.
+            return Response(status_code=503, content="Auth is not configured correctly on this deployment.")
 
         auth_header = request.headers.get("authorization", "")
         if auth_header.startswith("Basic "):
